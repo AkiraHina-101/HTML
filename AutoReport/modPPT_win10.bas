@@ -160,11 +160,10 @@ Private Sub ExportChart(ByVal co As chartObject, ByVal sld As Object, _
     sName = prefix & co.Name
     DeleteByName sld, sName
 
-    Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
-    Dim pptL As Double: pptL = (co.Left - bounds.Left) * scaleX
+    Dim pptL As Double: pptL = (co.Left - bounds.Left) * scaleY
     Dim pptT As Double: pptT = (co.Top - bounds.Top) * scaleY
-    Dim pptW As Double: pptW = co.Width * scaleX
+    Dim pptW As Double: pptW = co.Width * scaleY
     Dim pptH As Double: pptH = co.Height * scaleY
 
     Dim pptShp As Object
@@ -344,21 +343,18 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
     Dim xlTf  As TextFrame: Set xlTf = xlShp.TextFrame
     Dim pptTf As Object:    Set pptTf = pptShp.TextFrame
 
-    ' â”€â”€ Text content (tá»«ng character run) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' â”€â”€ Text + font (1 láº§n cho toÃ n bá»™ TextRange) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     pptTf.TextRange.Text = xlTf.Characters.Text
 
-    Dim i As Long
-    For i = 1 To xlTf.Characters.count
-        Dim xlFont As Font: Set xlFont = xlTf.Characters(i, 1).Font
-        With pptTf.TextRange.Characters(i, 1).Font
-            If Len(fontName) > 0 Then .Name = fontName Else .Name = xlFont.Name
-            .Size = xlFont.Size * scaleY
-            .Color.RGB = xlFont.Color
-            .Bold = (xlFont.Bold = True)
-            .Italic = (xlFont.Italic = True)
-            .Underline = (xlFont.Underline <> xlUnderlineStyleNone)
-        End With
-    Next i
+    Dim xlFont As Font: Set xlFont = xlTf.Characters.Font
+    With pptTf.TextRange.Font
+        If Len(fontName) > 0 Then .Name = fontName Else .Name = xlFont.Name
+        .Size = xlFont.Size * scaleY
+        .Color.RGB = xlFont.Color
+        .Bold = (xlFont.Bold = True)
+        .Italic = (xlFont.Italic = True)
+        .Underline = (xlFont.Underline <> xlUnderlineStyleNone)
+    End With
 
     ' â”€â”€ Paragraph alignment (H) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     ' Excel: xlLeft=-4131, xlCenter=-4108, xlRight=-4152, xlJustify=-4130
