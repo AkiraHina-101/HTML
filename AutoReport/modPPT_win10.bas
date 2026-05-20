@@ -91,7 +91,7 @@ Public Sub ExportToPPT()
 
         Dim labelShp As Shape
         For Each labelShp In ws.Shapes
-            If Left$(labelShp.Name, 9) = "LabelOut_" Then
+            If Left$(labelShp.Name, 9) = "LabelOut_" Or Left$(labelShp.Name, 10) = "PPT_Label_" Then
                 ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, lblFontSz, chartScale
             End If
         Next labelShp
