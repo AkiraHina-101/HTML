@@ -418,6 +418,33 @@ Private Function Pt(ByVal v As Double) As String
     Pt = Format$(v, "0.0")
 End Function
 
+' --- Tạo PPT_XL_DataTable_N liên tiếp bằng InputBox chọn range ---
+Public Sub CreateDataTableRanges()
+    Dim prefix As String: prefix = "PPT_XL_DataTable_"
+    Dim idx    As Long:   idx = 1
+
+    Do
+        Dim rng As Range
+        On Error Resume Next
+        Set rng = Application.InputBox( _
+            Prompt:="Chọn range cho " & prefix & idx & vbCrLf & "(Cancel để kết thúc)", _
+            Title:="Tạo DataTable " & idx, _
+            Type:=8)
+        On Error GoTo 0
+
+        If rng Is Nothing Then Exit Do
+
+        Dim nmName As String: nmName = prefix & idx
+        ThisWorkbook.Names.Add Name:=nmName, RefersTo:=rng
+        Debug.Print "[OK] " & nmName & " = " & rng.Address(External:=True)
+
+        idx = idx + 1
+    Loop
+
+    MsgBox "Đã tạo " & (idx - 1) & " named range." & vbCrLf & _
+           "Prefix: " & prefix & "1 → " & prefix & (idx - 1), vbInformation, "Hoàn tất"
+End Sub
+
 Private Function SlideIdxFromConfig(ByVal sheetName As String) As Long
     Dim cfgWs As Worksheet
     Set cfgWs = modConfig.GetConfigSheet()
