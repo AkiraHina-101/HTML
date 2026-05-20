@@ -161,10 +161,11 @@ Private Sub ExportChart(ByVal co As chartObject, ByVal sld As Object, _
     DeleteByName sld, sName
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
+    Dim scaleY As Double: scaleY = slideH / bounds.Height
     Dim pptL As Double: pptL = (co.Left - bounds.Left) * scaleX
-    Dim pptT As Double: pptT = (co.Top - bounds.Top) * scaleX
+    Dim pptT As Double: pptT = (co.Top - bounds.Top) * scaleY
     Dim pptW As Double: pptW = co.Width * scaleX
-    Dim pptH As Double: pptH = co.Height * scaleX
+    Dim pptH As Double: pptH = co.Height * scaleY
 
     Dim pptShp As Object
     Dim pasteErr As Long
@@ -218,10 +219,11 @@ Private Sub ExportLineShape(ByVal xlShp As Shape, ByVal sld As Object, _
     DeleteByName sld, xlShp.Name
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
+    Dim scaleY As Double: scaleY = slideH / bounds.Height
     Dim pptL   As Double: pptL = (xlShp.Left - bounds.Left) * scaleX
-    Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleX
+    Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleY
     Dim pptW   As Double: pptW = xlShp.Width * scaleX
-    Dim pptH   As Double: pptH = xlShp.Height * scaleX
+    Dim pptH   As Double: pptH = xlShp.Height * scaleY
 
     Dim pptShp As Object
     On Error Resume Next
@@ -320,36 +322,50 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
     DeleteByName sld, xlShp.Name
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
+    Dim scaleY As Double: scaleY = slideH / bounds.Height
     Dim pptL   As Double: pptL = (xlShp.Left - bounds.Left) * scaleX
-    Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleX
+    Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleY
     Dim pptW   As Double: pptW = xlShp.Width * scaleX
-    Dim pptH   As Double: pptH = xlShp.Height * scaleX
+    Dim pptH   As Double: pptH = xlShp.Height * scaleY
 
-    xlShp.CopyPicture Appearance:=xlScreen, Format:=xlPicture
-    DoEvents
-
+    ' â”€â”€ Táº¡o native PPT TextBox (editable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     Dim pptShp As Object
     On Error Resume Next
-    Err.Clear
-    Set pptShp = sld.Shapes.PasteSpecial(DataType:=ppPasteEnhancedMetafile)
-    Dim pasteErr As Long: pasteErr = Err.Number
+    Set pptShp = sld.Shapes.AddTextBox(1, pptL, pptT, pptW, pptH)
     On Error GoTo 0
-    Application.CutCopyMode = False
 
-    If pasteErr <> 0 Or pptShp Is Nothing Then
-        Debug.Print "  [ERR] ExportLabelShape paste '" & xlShp.Name & "': " & pasteErr
+    If pptShp Is Nothing Then
+        Debug.Print "  [ERR] ExportLabelShape AddTextBox '" & xlShp.Name & "' failed"
         Exit Sub
     End If
 
+    ' â”€â”€ Copy text vÃ  font tá»« Excel TextFrame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    Dim xlTf  As TextFrame: Set xlTf = xlShp.TextFrame
+    Dim pptTf As Object:    Set pptTf = pptShp.TextFrame
+
     On Error Resume Next
-    Set pptShp = FirstShapeFromPaste(pptShp)
-    pptShp.LockAspectRatio = msoFalse
-    pptShp.Left = pptL
-    pptShp.Top = pptT
-    pptShp.Width = pptW
-    pptShp.Height = pptH
-    If Len(fontName) > 0 Then pptShp.TextFrame.TextRange.Font.Name = fontName
-    If fontSize > 0 Then pptShp.TextFrame.TextRange.Font.Size = fontSize
+    pptTf.TextRange.Text = xlTf.Characters.Text
+
+    Dim fName As String: fName = fontName
+    Dim fSize As Double: fSize = fontSize
+    If Len(fName) = 0 Then fName = xlTf.Characters.Font.Name
+    If fSize <= 0 Then fSize = xlTf.Characters.Font.Size
+
+    With pptTf.TextRange.Font
+        If Len(fName) > 0 Then .Name = fName
+        If fSize > 0 Then .Size = fSize
+        .Color.RGB = xlTf.Characters.Font.Color
+        .Bold = xlTf.Characters.Font.Bold
+    End With
+
+    ' â”€â”€ Background fill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    If xlShp.Fill.Visible Then
+        pptShp.Fill.ForeColor.RGB = xlShp.Fill.ForeColor.RGB
+    Else
+        pptShp.Fill.Visible = msoFalse
+    End If
+
+    pptShp.Line.Visible = msoFalse
     pptShp.Name = xlShp.Name
     On Error GoTo 0
 
