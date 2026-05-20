@@ -361,6 +361,9 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
     Dim xlTf  As TextFrame: Set xlTf  = xlShp.TextFrame
     Dim pptTf As Object:    Set pptTf = pptShp.TextFrame
 
+    ' Lock size before setting text to prevent PPT auto-fit expanding the shape
+    pptTf.AutoSize = 0  ' ppAutoSizeNone
+
     ' Text
     pptTf.TextRange.Text = xlTf.Characters.Text
 
@@ -398,12 +401,7 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
     End Select
     pptTf.VerticalAnchor = vAlign
 
-    ' Word wrap and margins
-    pptTf.WordWrap      = xlTf.WordWrap
-    pptTf.MarginLeft    = xlTf.MarginLeft
-    pptTf.MarginRight   = xlTf.MarginRight
-    pptTf.MarginTop     = xlTf.MarginTop
-    pptTf.MarginBottom  = xlTf.MarginBottom
+    pptTf.WordWrap = xlTf.WordWrap
 
     ' Fill
     If xlShp.Fill.Visible = msoTrue Then
