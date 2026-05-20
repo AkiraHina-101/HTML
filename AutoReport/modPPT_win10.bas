@@ -261,8 +261,11 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
         End If
     End If
 
+    ' PasteSpecial returns ShapeRange (no .Tags). Retrieve the actual Shape by name.
+    Dim tagShp As Object
     On Error Resume Next
-    shp.Tags.Add "DataHash", RangeHash(rng)
+    Set tagShp = sld.Shapes(shapeName)
+    If Not tagShp Is Nothing Then tagShp.Tags.Add "DataHash", RangeHash(rng)
     On Error GoTo 0
     Debug.Print "  [OK] " & shapeName & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
                 " W=" & Pt(pptW) & " H=" & Pt(pptH)
