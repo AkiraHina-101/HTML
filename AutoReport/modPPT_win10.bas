@@ -31,10 +31,11 @@ Public Sub ExportToPPT()
     Dim tableName   As String: tableName = modConfig.CfgStr("DataTableName", "PPT_XL_DataTable")
     Dim chartPfx    As String: chartPfx = modConfig.CfgStr("ChartShapePrefix", "Chart_")
     Dim tblShpName  As String: tblShpName = modConfig.CfgStr("DataTableShapeName", "XL_DataTable")
-    Dim tblFont     As String: tblFont = modConfig.CfgStr("DataTableFontName", "")
-    Dim tblFontSz   As Double: tblFontSz = modConfig.CfgDbl("DataTableFontSize", 0)
-    Dim lblFontSz   As Double: lblFontSz = modConfig.CfgDbl("LabelFontSize", 0)
-    Dim lineWtScale As Double: lineWtScale = modConfig.CfgDbl("LineWeightScale", 1)
+    Dim tblFont     As String:  tblFont = modConfig.CfgStr("DataTableFontName", "")
+    Dim tblFontSz   As Double:  tblFontSz = modConfig.CfgDbl("DataTableFontSize", 0)
+    Dim lblFontSz   As Double:  lblFontSz = modConfig.CfgDbl("LabelFontSize", 0)
+    Dim hdrFontSz   As Double:  hdrFontSz = modConfig.CfgDbl("HeaderFontSize", 0)
+    Dim lineWtScale As Double:  lineWtScale = modConfig.CfgDbl("LineWeightScale", 1)
     If lineWtScale <= 0 Then lineWtScale = 1
 
     Dim pres As Object: Set pres = OpenPres()
@@ -86,7 +87,7 @@ Public Sub ExportToPPT()
                 On Error GoTo CleanFail
                 If Not dtRng Is Nothing Then
                     If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
-                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH
+                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH, tblFontSz
                     End If
                 End If
             End If
@@ -111,6 +112,8 @@ Public Sub ExportToPPT()
         For Each labelShp In ws.Shapes
             If Left$(labelShp.Name, 9) = "LabelOut_" Or Left$(labelShp.Name, 10) = "PPT_Label_" Then
                 ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, lblFontSz
+            ElseIf Left$(labelShp.Name, 11) = "PPT_Header_" Then
+                ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, hdrFontSz
             End If
         Next labelShp
 
@@ -181,7 +184,7 @@ End Sub
 Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal shapeName As String, _
                          ByVal slideW As Double, ByVal slideH As Double, _
-                         Optional ByVal sharedW As Double = 0)
+                         Optional ByVal cfgFontSz As Double = 0)
     DeleteByName sld, shapeName
 
     ' Fix zoom to 100% before copy so HTML pixel dimensions are consistent across sheets
@@ -217,13 +220,14 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     shp.Width = pptW:   shp.Height = pptH
     shp.Width = pptW:   shp.Height = pptH
 
-    ' Apply font size: Excel range font * scaleY, applied to all cells
+    ' Apply font size: use config value if set, else xlFontSz * scaleY
     Dim xlFontSz As Double
     On Error Resume Next
     xlFontSz = rng.Cells(1, 1).Font.Size
     On Error GoTo 0
-    If xlFontSz > 0 Then
-        Dim targetSz As Double: targetSz = xlFontSz * scaleY
+    If xlFontSz > 0 Or cfgFontSz > 0 Then
+        Dim targetSz As Double
+        targetSz = IIf(cfgFontSz > 0, cfgFontSz, xlFontSz * scaleY)
         Dim tbl As Object
         On Error Resume Next
         Set tbl = shp.Table
@@ -441,7 +445,7 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
     Dim xlFont As Font: Set xlFont = xlTf.Characters.Font
     With pptTf.TextRange.Font
         If Len(fontName) > 0 Then .Name = fontName Else .Name = xlFont.Name
-        .Size      = xlFont.Size * scaleY
+        .Size      = IIf(fontSize > 0, fontSize, xlFont.Size * scaleY)
         .Color.RGB = xlFont.Color
         .Bold      = (xlFont.Bold = True)
         .Italic    = (xlFont.Italic = True)
