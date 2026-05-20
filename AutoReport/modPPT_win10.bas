@@ -67,6 +67,8 @@ Private Sub RunExport(ByVal filterSlide As Long)
     Dim hdrFontSz   As Double: hdrFontSz   = modConfig.CfgDbl("HeaderFontSize",    0)
     Dim lineWtScale As Double: lineWtScale = modConfig.CfgDbl("LineWeightScale",   1)
     If lineWtScale <= 0 Then lineWtScale = 1
+    Dim updateOnly  As Boolean
+    updateOnly = (LCase(Trim$(modConfig.CfgStr("UpdateDataOnly", "False"))) = "true")
 
     Dim pres As Object: Set pres = OpenPres()
     If pres Is Nothing Then
@@ -93,7 +95,7 @@ Private Sub RunExport(ByVal filterSlide As Long)
         If filterSlide = 0 Or SlideIdxFromConfig(ws.Name) = filterSlide Then
             ExportSheetSafe ws, pres, boundsName, tableName, chartPfx, _
                             tblFont, tblFontSz, lblFontSz1, lblFontSz2, hdrFontSz, lineWtScale, _
-                            slideW, slideH
+                            slideW, slideH, updateOnly
         End If
     Next ws
     Debug.Print "=== ExportToPPT done [" & label & "] ==="
@@ -118,7 +120,8 @@ Private Sub ExportSheetSafe(ByVal ws As Worksheet, ByVal pres As Object, _
                               ByVal tblFontSz As Double, _
                               ByVal lblFontSz1 As Double, ByVal lblFontSz2 As Double, _
                               ByVal hdrFontSz As Double, ByVal lineWtScale As Double, _
-                              ByVal slideW As Double, ByVal slideH As Double)
+                              ByVal slideW As Double, ByVal slideH As Double, _
+                              ByVal updateOnly As Boolean)
     On Error GoTo SheetFail
 
     Dim slideIdx As Long: slideIdx = SlideIdxFromConfig(ws.Name)
@@ -148,7 +151,7 @@ Private Sub ExportSheetSafe(ByVal ws As Worksheet, ByVal pres As Object, _
             On Error GoTo SheetFail
             If Not dtRng Is Nothing Then
                 If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
-                    ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH, tblFontSz
+                    ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH, tblFontSz, updateOnly
                 End If
             End If
         End If
@@ -168,11 +171,11 @@ Private Sub ExportSheetSafe(ByVal ws As Worksheet, ByVal pres As Object, _
         ElseIf Left$(shp.Name, 8) = "PPT_Pic_" Then
             ExportPicShape shp, sld, bounds, slideW, slideH
         ElseIf Left$(shp.Name, 11) = "PPT_Label1_" Then
-            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz1
+            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz1, updateOnly
         ElseIf Left$(shp.Name, 11) = "PPT_Label2_" Then
-            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz2
+            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz2, updateOnly
         ElseIf Left$(shp.Name, 11) = "PPT_Header_" Then
-            ExportHeaderShape shp, sld, hdrFontSz
+            ExportHeaderShape shp, sld, hdrFontSz, updateOnly
         End If
     Next shp
     Exit Sub
@@ -186,7 +189,20 @@ End Sub
 Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal shapeName As String, _
                          ByVal slideW As Double, ByVal slideH As Double, _
-                         Optional ByVal cfgFontSz As Double = 0)
+                         ByVal cfgFontSz As Double, ByVal updateOnly As Boolean)
+    If updateOnly Then
+        Dim exShp As Object: Set exShp = GetShapeByName(sld, shapeName)
+        If Not exShp Is Nothing Then
+            Dim curHash As String: curHash = RangeHash(rng)
+            Dim savHash As String
+            On Error Resume Next
+            savHash = exShp.Tags("DataHash")
+            On Error GoTo 0
+            If savHash = curHash Then
+                Debug.Print "  [SKIP unchanged] " & shapeName: Exit Sub
+            End If
+        End If
+    End If
     DeleteByName sld, shapeName
 
     ' Normalize zoom so HTML pixel dimensions are consistent across sheets
@@ -245,6 +261,9 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
         End If
     End If
 
+    On Error Resume Next
+    shp.Tags.Add "DataHash", RangeHash(rng)
+    On Error GoTo 0
     Debug.Print "  [OK] " & shapeName & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
                 " W=" & Pt(pptW) & " H=" & Pt(pptH)
 End Sub
@@ -414,7 +433,7 @@ End Function
 ' Matches by shape name: Excel shape "PPT_Header_X" -> PPT placeholder named "PPT_Header_X".
 ' If no matching placeholder found, skip silently.
 Private Sub ExportHeaderShape(ByVal xlShp As Shape, ByVal sld As Object, _
-                               ByVal fontSize As Double)
+                               ByVal fontSize As Double, ByVal updateOnly As Boolean)
     Dim ph As Object
     Dim i  As Long
     For i = 1 To sld.Shapes.Count
@@ -429,9 +448,20 @@ Private Sub ExportHeaderShape(ByVal xlShp As Shape, ByVal sld As Object, _
     End If
 
     Dim txt As String: txt = xlShp.TextFrame.Characters.Text
+    If updateOnly Then
+        Dim savHash As String
+        On Error Resume Next
+        savHash = ph.Tags("DataHash")
+        On Error GoTo 0
+        If savHash = txt Then
+            Debug.Print "  [SKIP unchanged] " & xlShp.Name: Exit Sub
+        End If
+    End If
+
     On Error Resume Next
     ph.TextFrame.TextRange.Text = txt
     If fontSize > 0 Then ph.TextFrame.TextRange.Font.Size = fontSize
+    ph.Tags.Add "DataHash", txt
     On Error GoTo 0
 
     Debug.Print "  [OK] " & xlShp.Name & " -> [" & txt & "]"
@@ -443,7 +473,20 @@ End Sub
 Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
                               ByVal bounds As Range, ByVal slideW As Double, _
                               ByVal slideH As Double, ByVal fontName As String, _
-                              ByVal fontSize As Double)
+                              ByVal fontSize As Double, ByVal updateOnly As Boolean)
+    If updateOnly Then
+        Dim exShp As Object: Set exShp = GetShapeByName(sld, xlShp.Name)
+        If Not exShp Is Nothing Then
+            Dim curHash As String: curHash = xlShp.TextFrame.Characters.Text
+            Dim savHash As String
+            On Error Resume Next
+            savHash = exShp.Tags("DataHash")
+            On Error GoTo 0
+            If savHash = curHash Then
+                Debug.Print "  [SKIP unchanged] " & xlShp.Name: Exit Sub
+            End If
+        End If
+    End If
     DeleteByName sld, xlShp.Name
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
@@ -527,6 +570,7 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
         pptShp.Line.Visible = msoFalse
     End If
 
+    pptShp.Tags.Add "DataHash", xlShp.TextFrame.Characters.Text
     pptShp.Name = xlShp.Name
     On Error GoTo 0
 
@@ -537,6 +581,26 @@ End Sub
 ' --- Helpers ------------------------------------------------------------------
 Private Function Pt(ByVal v As Double) As String
     Pt = Format$(v, "0.0")
+End Function
+
+' Concatenate all cell values into a single string for change detection.
+Private Function RangeHash(ByVal rng As Range) As String
+    Dim s As String, c As Range
+    For Each c In rng.Cells
+        s = s & CStr(c.Value2) & "|"
+    Next c
+    RangeHash = s
+End Function
+
+' Return the first PPT shape on a slide matching sName, or Nothing.
+Private Function GetShapeByName(ByVal sld As Object, ByVal sName As String) As Object
+    Dim i As Long
+    For i = 1 To sld.Shapes.Count
+        If StrComp(sld.Shapes(i).Name, sName, vbTextCompare) = 0 Then
+            Set GetShapeByName = sld.Shapes(i)
+            Exit Function
+        End If
+    Next i
 End Function
 
 Private Function OpenPres() As Object
