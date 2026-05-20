@@ -217,8 +217,9 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     shp.LockAspectRatio = msoFalse
     shp.Left            = pptL
     shp.Top             = pptT
-    shp.Width = pptW:   shp.Height = pptH
-    shp.Width = pptW:   shp.Height = pptH
+    shp.Width           = pptW
+    ' Note: do not force Height — PPT table row min-height constraint causes actual height
+    ' to exceed pptH, which would shift labels below out of position
 
     ' Apply font size: use config value if set, else xlFontSz * scaleY
     Dim xlFontSz As Double
