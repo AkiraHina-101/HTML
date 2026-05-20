@@ -156,7 +156,7 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
         refRowH(r) = refTbl.Rows(r).Height
     Next r
 
-    ' Apply to all other matching shapes: set W, col widths, row heights
+    ' Apply proportional column widths only (preserve each table's own total W and row heights)
     Dim i As Long
     For i = 1 To sld.Shapes.Count
         Dim shp As Object: Set shp = sld.Shapes(i)
@@ -165,21 +165,18 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
             On Error Resume Next
             Dim tbl As Object: Set tbl = shp.Table
             If Not tbl Is Nothing Then
-                If tbl.Columns.Count = nCols Then
-                    ' Set total width first
-                    shp.Width = refTotalW
-                    ' Sync column widths (absolute)
+                If tbl.Columns.Count = nCols And refTotalW > 0 Then
+                    ' Get this table's current total width
+                    Dim thisTotalW As Double: thisTotalW = 0
                     For c = 1 To nCols
-                        tbl.Columns(c).Width = refColW(c)
+                        thisTotalW = thisTotalW + tbl.Columns(c).Width
                     Next c
+                    ' Apply same column ratio as _1, scaled to this table's own W
+                    For c = 1 To nCols
+                        tbl.Columns(c).Width = thisTotalW * (refColW(c) / refTotalW)
+                    Next c
+                    Debug.Print "  [SYNC cols] " & shp.Name
                 End If
-                ' Sync row heights (absolute) if row count matches
-                If tbl.Rows.Count = nRows Then
-                    For r = 1 To nRows
-                        tbl.Rows(r).Height = refRowH(r)
-                    Next r
-                End If
-                Debug.Print "  [SYNC] " & shp.Name
             End If
             On Error GoTo 0
         End If
