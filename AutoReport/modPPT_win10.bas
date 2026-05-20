@@ -41,9 +41,9 @@ Public Sub ExportToPPT()
     Dim chartPfx    As String: chartPfx    = modConfig.CfgStr("ChartShapePrefix",  "Chart_")
     Dim tblFont     As String: tblFont     = modConfig.CfgStr("DataTableFontName", "")
     Dim tblFontSz   As Double: tblFontSz   = modConfig.CfgDbl("DataTableFontSize", 0)
-    Dim lblFontSz   As Double: lblFontSz   = modConfig.CfgDbl("LabelFontSize",     0)
-    Dim hdrFontSz1  As Double: hdrFontSz1  = modConfig.CfgDbl("HeaderFontSize1",   0)
-    Dim hdrFontSz2  As Double: hdrFontSz2  = modConfig.CfgDbl("HeaderFontSize2",   0)
+    Dim lblFontSz1  As Double: lblFontSz1  = modConfig.CfgDbl("LabelFontSize1",    0)
+    Dim lblFontSz2  As Double: lblFontSz2  = modConfig.CfgDbl("LabelFontSize2",    0)
+    Dim hdrFontSz   As Double: hdrFontSz   = modConfig.CfgDbl("HeaderFontSize",    0)
     Dim lineWtScale As Double: lineWtScale = modConfig.CfgDbl("LineWeightScale",   1)
     If lineWtScale <= 0 Then lineWtScale = 1
 
@@ -67,7 +67,7 @@ Public Sub ExportToPPT()
     Dim ws As Worksheet
     For Each ws In ThisWorkbook.Worksheets
         ExportSheetSafe ws, pres, boundsName, tableName, chartPfx, _
-                        tblFont, tblFontSz, lblFontSz, hdrFontSz1, hdrFontSz2, lineWtScale, _
+                        tblFont, tblFontSz, lblFontSz1, lblFontSz2, hdrFontSz, lineWtScale, _
                         slideW, slideH
     Next ws
     Debug.Print "=== ExportToPPT done ==="
@@ -89,9 +89,9 @@ End Sub
 Private Sub ExportSheetSafe(ByVal ws As Worksheet, ByVal pres As Object, _
                               ByVal boundsName As String, ByVal tableName As String, _
                               ByVal chartPfx As String, ByVal tblFont As String, _
-                              ByVal tblFontSz As Double, ByVal lblFontSz As Double, _
-                              ByVal hdrFontSz1 As Double, ByVal hdrFontSz2 As Double, _
-                              ByVal lineWtScale As Double, _
+                              ByVal tblFontSz As Double, _
+                              ByVal lblFontSz1 As Double, ByVal lblFontSz2 As Double, _
+                              ByVal hdrFontSz As Double, ByVal lineWtScale As Double, _
                               ByVal slideW As Double, ByVal slideH As Double)
     On Error GoTo SheetFail
 
@@ -139,12 +139,12 @@ Private Sub ExportSheetSafe(ByVal ws As Worksheet, ByVal pres As Object, _
     For Each shp In ws.Shapes
         If Left$(shp.Name, 5) = "Line_" Then
             ExportLineShape shp, sld, bounds, slideW, slideH, lineWtScale
-        ElseIf Left$(shp.Name, 9) = "LabelOut_" Or Left$(shp.Name, 10) = "PPT_Label_" Then
-            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz
-        ElseIf Left$(shp.Name, 12) = "PPT_Header2_" Then
-            ExportHeaderShape shp, sld, hdrFontSz2
+        ElseIf Left$(shp.Name, 11) = "PPT_Label1_" Then
+            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz1
+        ElseIf Left$(shp.Name, 11) = "PPT_Label2_" Then
+            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz2
         ElseIf Left$(shp.Name, 11) = "PPT_Header_" Then
-            ExportHeaderShape shp, sld, hdrFontSz1
+            ExportHeaderShape shp, sld, hdrFontSz
         End If
     Next shp
     Exit Sub
