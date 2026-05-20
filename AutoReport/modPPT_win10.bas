@@ -72,8 +72,10 @@ Public Sub ExportToPPT()
         pres.Application.ActiveWindow.View.GotoSlide slideIdx
         On Error GoTo CleanFail
 
-        ' Export tất cả named range có tên bắt đầu bằng tableName (PPT_XL_DataTable_...)
+        ' Pass 1: collect all DataTable ranges on this sheet, find max scaled width
         Dim nm As Name
+        Dim scaleXt As Double: scaleXt = slideW / bounds.Width
+        Dim maxTblW As Double: maxTblW = 0
         For Each nm In ThisWorkbook.Names
             Dim nmLocal As String
             nmLocal = nm.Name
@@ -85,7 +87,25 @@ Public Sub ExportToPPT()
                 On Error GoTo CleanFail
                 If Not dtRng Is Nothing Then
                     If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
-                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH
+                        Dim tW As Double: tW = dtRng.Width * scaleXt
+                        If tW > maxTblW Then maxTblW = tW
+                    End If
+                End If
+            End If
+        Next nm
+
+        ' Pass 2: export each table using shared maxTblW
+        For Each nm In ThisWorkbook.Names
+            nmLocal = nm.Name
+            If InStr(nmLocal, "!") > 0 Then nmLocal = Mid$(nmLocal, InStr(nmLocal, "!") + 1)
+            If Left$(nmLocal, Len(tableName)) = tableName Then
+                Set dtRng = Nothing
+                On Error Resume Next
+                Set dtRng = nm.RefersToRange
+                On Error GoTo CleanFail
+                If Not dtRng Is Nothing Then
+                    If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
+                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH, maxTblW
                     End If
                 End If
             End If
@@ -125,7 +145,8 @@ End Sub
 ' --- DataTable ----------------------------------------------------------------
 Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal shapeName As String, _
-                         ByVal slideW As Double, ByVal slideH As Double)
+                         ByVal slideW As Double, ByVal slideH As Double, _
+                         Optional ByVal sharedW As Double = 0)
     DeleteByName sld, shapeName
     rng.Copy
 
@@ -141,8 +162,9 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     Dim scaleY As Double: scaleY = slideH / bounds.Height
     Dim pptL   As Double: pptL = (rng.Left                  - bounds.Left) * scaleX
     Dim pptT   As Double: pptT = (rng.Top                   - bounds.Top)  * scaleY
-    Dim pptW   As Double: pptW = (rng.Left + rng.Width      - bounds.Left) * scaleX - pptL
-    Dim pptH   As Double: pptH = (rng.Top  + rng.Height     - bounds.Top)  * scaleY - pptT
+    Dim pptW   As Double: pptW = (rng.Left + rng.Width  - bounds.Left) * scaleX - pptL
+    Dim pptH   As Double: pptH = (rng.Top  + rng.Height - bounds.Top)  * scaleY - pptT
+    If sharedW > 0 Then pptW = sharedW  ' use max width across all tables on this slide
 
     shp.Name             = shapeName
     shp.LockAspectRatio  = msoFalse
