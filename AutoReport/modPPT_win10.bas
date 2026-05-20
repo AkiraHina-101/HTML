@@ -439,7 +439,7 @@ Private Sub ExportHeaderShape(ByVal xlShp As Shape, ByVal sld As Object, _
     End If
     On Error GoTo 0
 
-    Debug.Print "  [OK] " & xlShp.Name & " -> placeholder " & phIdx & " [" & txt & "]"
+    Debug.Print "  [OK] " & xlShp.Name & " -> placeholder [" & txt & "]"
 End Sub
 
 ' --- Label shapes (LabelOut_ prefix) ------------------------------------------
