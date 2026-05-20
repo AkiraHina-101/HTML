@@ -72,16 +72,17 @@ Public Sub ExportToPPT()
         pres.Application.ActiveWindow.View.GotoSlide slideIdx
         On Error GoTo CleanFail
 
-        ' Pass 1: collect all DataTable ranges on this sheet, find max scaled width
-        Dim nm As Name
-        Dim scaleXt As Double: scaleXt = slideW / bounds.Width
+        ' Pass 1: find max scaled width across all DataTable ranges on this sheet
+        Dim nm      As Name
+        Dim nmLocal As String
+        Dim dtRng   As Range
         Dim maxTblW As Double: maxTblW = 0
+        Dim scaleXt As Double: scaleXt = slideW / bounds.Width
         For Each nm In ThisWorkbook.Names
-            Dim nmLocal As String
             nmLocal = nm.Name
             If InStr(nmLocal, "!") > 0 Then nmLocal = Mid$(nmLocal, InStr(nmLocal, "!") + 1)
             If Left$(nmLocal, Len(tableName)) = tableName Then
-                Dim dtRng As Range
+                Set dtRng = Nothing
                 On Error Resume Next
                 Set dtRng = nm.RefersToRange
                 On Error GoTo CleanFail
@@ -89,10 +90,12 @@ Public Sub ExportToPPT()
                     If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
                         Dim tW As Double: tW = dtRng.Width * scaleXt
                         If tW > maxTblW Then maxTblW = tW
+                        Debug.Print "  [TBL width] " & nmLocal & " = " & Pt(tW)
                     End If
                 End If
             End If
         Next nm
+        Debug.Print "  [TBL maxW] " & Pt(maxTblW)
 
         ' Pass 2: export each table using shared maxTblW
         For Each nm In ThisWorkbook.Names
