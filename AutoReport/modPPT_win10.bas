@@ -1,3 +1,4 @@
+Attribute VB_Name = "modPPT_win10"
 Option Explicit
 
 ' =============================================================================
@@ -40,7 +41,7 @@ Public Sub ExportToPPT()
     If pres Is Nothing Then
         Debug.Print "ExportToPPT: cannot open presentation": GoTo CleanExit
     End If
-    Debug.Print "=== ExportToPPT_win10 start: " & pres.Name & " (" & pres.Slides.count & " slides) ==="
+    Debug.Print "=== ExportToPPT_win10 start: " & pres.Name & " (" & pres.Slides.Count & " slides) ==="
 
     Dim slideW As Double: slideW = pres.PageSetup.SlideWidth
     Dim slideH As Double: slideH = pres.PageSetup.SlideHeight
@@ -55,7 +56,7 @@ Public Sub ExportToPPT()
     For Each ws In ThisWorkbook.Worksheets
         Dim slideIdx As Long
         slideIdx = SlideIdxFromConfig(ws.Name)
-        If slideIdx < 1 Or slideIdx > pres.Slides.count Then GoTo NextSheet
+        If slideIdx < 1 Or slideIdx > pres.Slides.Count Then GoTo NextSheet
 
         Dim bounds As Range
         Set bounds = modLayout.FindNamedRange(ws, boundsName)
@@ -71,12 +72,27 @@ Public Sub ExportToPPT()
         pres.Application.ActiveWindow.View.GotoSlide slideIdx
         On Error GoTo CleanFail
 
-        Dim dtRng As Range
-        Set dtRng = modLayout.FindNamedRange(ws, tableName)
-        If Not dtRng Is Nothing Then ExportTable dtRng, sld, bounds, tblShpName, slideW, slideH
+        ' Export tất cả named range có tên bắt đầu bằng tableName (PPT_XL_DataTable_...)
+        Dim nm As Name
+        For Each nm In ThisWorkbook.Names
+            Dim nmLocal As String
+            nmLocal = nm.Name
+            If InStr(nmLocal, "!") > 0 Then nmLocal = Mid$(nmLocal, InStr(nmLocal, "!") + 1)
+            If Left$(nmLocal, Len(tableName)) = tableName Then
+                Dim dtRng As Range
+                On Error Resume Next
+                Set dtRng = nm.RefersToRange
+                On Error GoTo CleanFail
+                If Not dtRng Is Nothing Then
+                    If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
+                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH
+                    End If
+                End If
+            End If
+        Next nm
 
-        Dim co As chartObject
-        For Each co In ws.chartObjects
+        Dim co As ChartObject
+        For Each co In ws.ChartObjects
             ExportChart co, sld, bounds, chartPfx, slideW, slideH
         Next co
 
@@ -136,17 +152,18 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
 End Sub
 
 ' --- Charts -------------------------------------------------------------------
-Private Sub ExportChart(ByVal co As chartObject, ByVal sld As Object, _
+Private Sub ExportChart(ByVal co As ChartObject, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal prefix As String, _
                          ByVal slideW As Double, ByVal slideH As Double)
     Dim sName As String
     sName = prefix & co.Name
     DeleteByName sld, sName
 
+    Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
-    Dim pptL As Double: pptL = (co.Left - bounds.Left) * scaleY
-    Dim pptT As Double: pptT = (co.Top - bounds.Top) * scaleY
-    Dim pptW As Double: pptW = co.Width * scaleY
+    Dim pptL As Double: pptL = (co.Left - bounds.Left) * scaleX
+    Dim pptT As Double: pptT = (co.Top  - bounds.Top)  * scaleY
+    Dim pptW As Double: pptW = co.Width  * scaleX
     Dim pptH As Double: pptH = co.Height * scaleY
 
     Dim pptShp As Object
@@ -174,11 +191,11 @@ Private Sub ExportChart(ByVal co As chartObject, ByVal sld As Object, _
     On Error Resume Next
     Set pptShp = FirstShapeFromPaste(pptShp)
     pptShp.LockAspectRatio = msoFalse
-    pptShp.Left = pptL
-    pptShp.Top = pptT
-    pptShp.Width = pptW
+    pptShp.Left   = pptL
+    pptShp.Top    = pptT
+    pptShp.Width  = pptW
     pptShp.Height = pptH
-    pptShp.Name = sName
+    pptShp.Name   = sName
     On Error GoTo 0
 
     Debug.Print "  [OK] " & sName & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
@@ -187,13 +204,13 @@ End Sub
 
 Private Function FirstShapeFromPaste(ByVal pasted As Object) As Object
     On Error Resume Next
-    Set FirstShapeFromPaste = pasted.item(1)
+    Set FirstShapeFromPaste = pasted.Item(1)
     If FirstShapeFromPaste Is Nothing Then Set FirstShapeFromPaste = pasted
     On Error GoTo 0
 End Function
 
 ' --- Line shapes (Line_ prefix) -----------------------------------------------
-' Type=9 (msoLine): AddConnector in PPT â€” preserves color/dash/weight + lineWtScale.
+' Type=9 (msoLine): AddConnector in PPT — preserves color/dash/weight + lineWtScale.
 ' Oval markers    : AddShape (exact fill color, no outline).
 Private Sub ExportLineShape(ByVal xlShp As Shape, ByVal sld As Object, _
                              ByVal bounds As Range, ByVal slideW As Double, _
@@ -203,8 +220,8 @@ Private Sub ExportLineShape(ByVal xlShp As Shape, ByVal sld As Object, _
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
     Dim pptL   As Double: pptL = (xlShp.Left - bounds.Left) * scaleX
-    Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleY
-    Dim pptW   As Double: pptW = xlShp.Width * scaleX
+    Dim pptT   As Double: pptT = (xlShp.Top  - bounds.Top)  * scaleY
+    Dim pptW   As Double: pptW = xlShp.Width  * scaleX
     Dim pptH   As Double: pptH = xlShp.Height * scaleY
 
     Dim pptShp As Object
@@ -212,24 +229,24 @@ Private Sub ExportLineShape(ByVal xlShp As Shape, ByVal sld As Object, _
     Err.Clear
 
     If xlShp.Type = 9 Then
-        ' msoConnectorStraight = 1 â€” vertical line from (pptL, pptT) to (pptL, pptT+pptH)
+        ' msoConnectorStraight = 1 — vertical line from (pptL, pptT) to (pptL, pptT+pptH)
         Set pptShp = sld.Shapes.AddConnector(1, pptL, pptT, pptL, pptT + pptH)
         If Err.Number = 0 And Not pptShp Is Nothing Then
             With pptShp.Line
                 .ForeColor.RGB = xlShp.Line.ForeColor.RGB
-                .Weight = xlShp.Line.Weight * lineWtScale
-                .DashStyle = XlDashToMso(xlShp.Line.DashStyle)
+                .Weight        = xlShp.Line.Weight * lineWtScale
+                .DashStyle     = XlDashToMso(xlShp.Line.DashStyle)
             End With
             pptShp.Name = xlShp.Name
         End If
         On Error GoTo 0
     Else
-        ' Oval marker â€” AddShape (exact fill, no outline)
+        ' Oval marker — AddShape (exact fill, no outline)
         Set pptShp = sld.Shapes.AddShape(9, pptL, pptT, pptW, pptH)
         If Err.Number = 0 And Not pptShp Is Nothing Then
-            pptShp.Line.Visible = msoFalse
+            pptShp.Line.Visible       = msoFalse
             pptShp.Fill.ForeColor.RGB = xlShp.Fill.ForeColor.RGB
-            pptShp.Name = xlShp.Name
+            pptShp.Name               = xlShp.Name
         End If
         On Error GoTo 0
     End If
@@ -238,7 +255,7 @@ Private Sub ExportLineShape(ByVal xlShp As Shape, ByVal sld As Object, _
                 " W=" & Pt(pptW) & " H=" & Pt(pptH)
 End Sub
 
-' Map Excel XlLineStyle dash constants â†’ PPT MsoDashStyle constants
+' Map Excel XlLineStyle dash constants → PPT MsoDashStyle constants
 Private Function XlDashToMso(ByVal xlDash As Long) As Long
     Select Case xlDash
         Case 1       ' xlSolid
@@ -266,7 +283,7 @@ Private Function OpenPres() As Object
     If Mid$(cfgPath, 2, 1) = ":" Or Left$(cfgPath, 2) = "\\" Then
         pptxPath = cfgPath
     Else
-        pptxPath = ThisWorkbook.path & "\" & cfgPath
+        pptxPath = ThisWorkbook.Path & "\" & cfgPath
     End If
 
     Dim pptApp As Object
@@ -280,7 +297,7 @@ Private Function OpenPres() As Object
 
     Dim p As Object
     For Each p In pptApp.Presentations
-        If StrComp(p.fullName, pptxPath, vbTextCompare) = 0 Then
+        If StrComp(p.FullName, pptxPath, vbTextCompare) = 0 Then
             Set OpenPres = p: Exit Function
         End If
     Next p
@@ -289,7 +306,7 @@ End Function
 
 Private Sub DeleteByName(ByVal sld As Object, ByVal sName As String)
     Dim i As Long
-    For i = sld.Shapes.count To 1 Step -1
+    For i = sld.Shapes.Count To 1 Step -1
         If StrComp(sld.Shapes(i).Name, sName, vbTextCompare) = 0 Then
             sld.Shapes(i).Delete
         End If
@@ -306,11 +323,11 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
     Dim pptL   As Double: pptL = (xlShp.Left - bounds.Left) * scaleX
-    Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleY
-    Dim pptW   As Double: pptW = xlShp.Width * scaleX
+    Dim pptT   As Double: pptT = (xlShp.Top  - bounds.Top)  * scaleY
+    Dim pptW   As Double: pptW = xlShp.Width  * scaleX
     Dim pptH   As Double: pptH = xlShp.Height * scaleY
 
-    ' â”€â”€ Táº¡o native PPT TextBox (editable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' ── Tạo native PPT TextBox (editable) ────────────────────
     Dim pptShp As Object
     On Error Resume Next
     Set pptShp = sld.Shapes.AddTextBox(1, pptL, pptT, pptW, pptH)
@@ -326,66 +343,66 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
     Dim xlTf  As TextFrame: Set xlTf = xlShp.TextFrame
     Dim pptTf As Object:    Set pptTf = pptShp.TextFrame
 
-    ' â”€â”€ Text + font (1 láº§n cho toÃ n bá»™ TextRange) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' ── Text + font (1 lần cho toàn bộ TextRange) ───────────
     pptTf.TextRange.Text = xlTf.Characters.Text
 
     Dim xlFont As Font: Set xlFont = xlTf.Characters.Font
     With pptTf.TextRange.Font
         If Len(fontName) > 0 Then .Name = fontName Else .Name = xlFont.Name
-        .Size = xlFont.Size * scaleY
+        .Size      = xlFont.Size * scaleY
         .Color.RGB = xlFont.Color
-        .Bold = (xlFont.Bold = True)
-        .Italic = (xlFont.Italic = True)
+        .Bold      = (xlFont.Bold = True)
+        .Italic    = (xlFont.Italic = True)
         .Underline = (xlFont.Underline <> xlUnderlineStyleNone)
     End With
 
-    ' â”€â”€ Paragraph alignment (H) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' ── Paragraph alignment (H) ──────────────────────────────
     ' Excel: xlLeft=-4131, xlCenter=-4108, xlRight=-4152, xlJustify=-4130
     ' PPT  : ppAlignLeft=1, ppAlignCenter=2, ppAlignRight=3, ppAlignJustify=4
     Dim hAlign As Long
     Select Case xlTf.HorizontalAlignment
-        Case -4108: hAlign = 2  ' xlCenter â†’ ppAlignCenter
-        Case -4152: hAlign = 3  ' xlRight  â†’ ppAlignRight
-        Case -4130: hAlign = 4  ' xlJustify â†’ ppAlignJustify
-        Case Else:  hAlign = 1  ' xlLeft   â†’ ppAlignLeft
+        Case -4108: hAlign = 2  ' xlCenter → ppAlignCenter
+        Case -4152: hAlign = 3  ' xlRight  → ppAlignRight
+        Case -4130: hAlign = 4  ' xlJustify → ppAlignJustify
+        Case Else:  hAlign = 1  ' xlLeft   → ppAlignLeft
     End Select
     pptTf.TextRange.ParagraphFormat.Alignment = hAlign
 
-    ' â”€â”€ Vertical anchor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' ── Vertical anchor ──────────────────────────────────────
     ' Excel: xlTop=-4160, xlCenter=-4108, xlBottom=-4107
     ' PPT  : msoAnchorTop=1, msoAnchorMiddle=3, msoAnchorBottom=4
     Dim vAlign As Long
     Select Case xlTf.VerticalAlignment
-        Case -4108: vAlign = 3  ' xlCenter â†’ msoAnchorMiddle
-        Case -4107: vAlign = 4  ' xlBottom â†’ msoAnchorBottom
-        Case Else:  vAlign = 1  ' xlTop    â†’ msoAnchorTop
+        Case -4108: vAlign = 3  ' xlCenter → msoAnchorMiddle
+        Case -4107: vAlign = 4  ' xlBottom → msoAnchorBottom
+        Case Else:  vAlign = 1  ' xlTop    → msoAnchorTop
     End Select
     pptTf.VerticalAnchor = vAlign
 
-    ' â”€â”€ Word wrap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' ── Word wrap ────────────────────────────────────────────
     pptTf.WordWrap = xlTf.WordWrap
 
-    ' â”€â”€ Margins â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    pptTf.MarginLeft = xlTf.MarginLeft
-    pptTf.MarginRight = xlTf.MarginRight
-    pptTf.MarginTop = xlTf.MarginTop
+    ' ── Margins ──────────────────────────────────────────────
+    pptTf.MarginLeft   = xlTf.MarginLeft
+    pptTf.MarginRight  = xlTf.MarginRight
+    pptTf.MarginTop    = xlTf.MarginTop
     pptTf.MarginBottom = xlTf.MarginBottom
 
-    ' â”€â”€ Fill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' ── Fill ─────────────────────────────────────────────────
     If xlShp.Fill.Visible = msoTrue Then
         pptShp.Fill.Solid
         pptShp.Fill.ForeColor.RGB = xlShp.Fill.ForeColor.RGB
-        pptShp.Fill.Transparency = xlShp.Fill.Transparency
+        pptShp.Fill.Transparency  = xlShp.Fill.Transparency
     Else
         pptShp.Fill.Visible = msoFalse
     End If
 
-    ' â”€â”€ Border (Line) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' ── Border (Line) ─────────────────────────────────────────
     If xlShp.Line.Visible = msoTrue Then
-        pptShp.Line.Visible = msoTrue
-        pptShp.Line.ForeColor.RGB = xlShp.Line.ForeColor.RGB
-        pptShp.Line.Weight = xlShp.Line.Weight
-        pptShp.Line.DashStyle = XlDashToMso(xlShp.Line.DashStyle)
+        pptShp.Line.Visible        = msoTrue
+        pptShp.Line.ForeColor.RGB  = xlShp.Line.ForeColor.RGB
+        pptShp.Line.Weight         = xlShp.Line.Weight
+        pptShp.Line.DashStyle      = XlDashToMso(xlShp.Line.DashStyle)
     Else
         pptShp.Line.Visible = msoFalse
     End If
