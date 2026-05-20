@@ -146,6 +146,7 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
     Dim nCols     As Long:   nCols = refTbl.Columns.Count
     Dim nRows     As Long:   nRows = refTbl.Rows.Count
     Dim refTotalW As Double: refTotalW = 0
+    Dim refTotalH As Double: refTotalH = 0
     Dim refColW() As Double: ReDim refColW(1 To nCols)
     Dim refRowH() As Double: ReDim refRowH(1 To nRows)
     Dim c As Long, r As Long
@@ -155,6 +156,7 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
     Next c
     For r = 1 To nRows
         refRowH(r) = refTbl.Rows(r).Height
+        refTotalH  = refTotalH + refRowH(r)
     Next r
     If refTotalW = 0 Then Exit Sub
 
@@ -178,11 +180,17 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
                         Next c
                     End If
                 End If
-                ' Sync row heights (only when row count matches)
-                If tbl.Rows.Count = nRows Then
+                ' Sync row height ratios (preserves each table's own total height)
+                If tbl.Rows.Count = nRows And refTotalH > 0 Then
+                    Dim thisTotalH As Double: thisTotalH = 0
                     For r = 1 To nRows
-                        tbl.Rows(r).Height = refRowH(r)
+                        thisTotalH = thisTotalH + tbl.Rows(r).Height
                     Next r
+                    If thisTotalH > 0 Then
+                        For r = 1 To nRows
+                            tbl.Rows(r).Height = thisTotalH * (refRowH(r) / refTotalH)
+                        Next r
+                    End If
                 End If
                 Debug.Print "  [SYNC] " & shp.Name
             End If
