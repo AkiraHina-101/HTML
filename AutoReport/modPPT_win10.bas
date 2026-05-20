@@ -140,7 +140,8 @@ End Sub
 Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal shapeName As String, _
                          ByVal slideW As Double, ByVal slideH As Double, _
-                         Optional ByVal sharedW As Double = 0)
+                         Optional ByVal sharedW As Double = 0, _
+                         Optional ByVal fixedCols As Long = 2)
     DeleteByName sld, shapeName
     rng.Copy
 
@@ -154,22 +155,54 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
-    Dim pptL   As Double: pptL = (rng.Left                  - bounds.Left) * scaleX
-    Dim pptT   As Double: pptT = (rng.Top                   - bounds.Top)  * scaleY
-    Dim pptW   As Double: pptW = (rng.Left + rng.Width  - bounds.Left) * scaleX - pptL
-    Dim pptH   As Double: pptH = (rng.Top  + rng.Height - bounds.Top)  * scaleY - pptT
-    If sharedW > 0 Then pptW = sharedW  ' use max width across all tables on this slide
+    Dim pptL   As Double: pptL = (rng.Left               - bounds.Left) * scaleX
+    Dim pptT   As Double: pptT = (rng.Top                - bounds.Top)  * scaleY
+    Dim pptW   As Double: pptW = (rng.Left + rng.Width   - bounds.Left) * scaleX - pptL
+    Dim pptH   As Double: pptH = (rng.Top  + rng.Height  - bounds.Top)  * scaleY - pptT
 
-    shp.Name             = shapeName
-    shp.LockAspectRatio  = msoFalse
-    shp.Left             = pptL
-    shp.Top              = pptT
-    ' Set Width/Height twice: first pass breaks internal table lock, second pass applies exact size
-    shp.Width  = pptW:  shp.Height = pptH
-    shp.Width  = pptW:  shp.Height = pptH
+    shp.Name            = shapeName
+    shp.LockAspectRatio = msoFalse
+    shp.Left            = pptL
+    shp.Top             = pptT
+    shp.Width = pptW:   shp.Height = pptH
+    shp.Width = pptW:   shp.Height = pptH
+
+    ' Scale only columns after fixedCols to fill sharedW
+    If sharedW > 0 And sharedW <> pptW Then
+        On Error Resume Next
+        Dim tbl As Object: Set tbl = shp.Table
+        If Not tbl Is Nothing Then
+            Dim nCols As Long: nCols = tbl.Columns.Count
+            If fixedCols < nCols Then
+                ' Sum fixed col widths
+                Dim fixedW As Double: fixedW = 0
+                Dim c As Long
+                For c = 1 To fixedCols
+                    fixedW = fixedW + tbl.Columns(c).Width
+                Next c
+                ' Sum remaining col widths (original)
+                Dim origRemainW As Double: origRemainW = 0
+                For c = fixedCols + 1 To nCols
+                    origRemainW = origRemainW + tbl.Columns(c).Width
+                Next c
+                ' Target remaining width
+                Dim targetRemainW As Double: targetRemainW = sharedW - fixedW
+                ' Scale each remaining col proportionally
+                If origRemainW > 0 And targetRemainW > 0 Then
+                    Dim ratio As Double: ratio = targetRemainW / origRemainW
+                    For c = fixedCols + 1 To nCols
+                        tbl.Columns(c).Width = tbl.Columns(c).Width * ratio
+                    Next c
+                End If
+            End If
+        End If
+        On Error GoTo 0
+        ' Apply final height
+        shp.Height = pptH
+    End If
 
     Debug.Print "  [OK] " & shapeName & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
-                " W=" & Pt(pptW) & " H=" & Pt(pptH)
+                " W=" & Pt(shp.Width) & " H=" & Pt(pptH)
 End Sub
 
 ' --- Charts -------------------------------------------------------------------
