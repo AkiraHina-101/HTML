@@ -105,6 +105,9 @@ Public Sub ExportToPPT()
             End If
         Next nm
 
+        ' Pass 3: sync column widths of all tables to match table_1
+        SyncTableColumns sld, tableName
+
         Dim co As ChartObject
         For Each co In ws.ChartObjects
             ExportChart co, sld, bounds, chartPfx, slideW, slideH
@@ -134,6 +137,51 @@ CleanExit:
 CleanFail:
     Debug.Print "[ERROR] " & ws.Name & ": " & Err.Number & " - " & Err.Description
     Resume NextSheet
+End Sub
+
+' --- Sync all DataTable column widths to match _1 ----------------------------
+Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
+    ' Find reference shape (tableName & "_1")
+    Dim refShp As Object
+    On Error Resume Next
+    Set refShp = sld.Shapes(tablePrefix & "_1")
+    On Error GoTo 0
+    If refShp Is Nothing Then Exit Sub
+
+    Dim refTbl As Object
+    On Error Resume Next
+    Set refTbl = refShp.Table
+    On Error GoTo 0
+    If refTbl Is Nothing Then Exit Sub
+
+    ' Read reference column widths
+    Dim nCols As Long: nCols = refTbl.Columns.Count
+    Dim refColW() As Double
+    ReDim refColW(1 To nCols)
+    Dim c As Long
+    For c = 1 To nCols
+        refColW(c) = refTbl.Columns(c).Width
+    Next c
+
+    ' Apply to all other matching shapes on this slide
+    Dim i As Long
+    For i = 1 To sld.Shapes.Count
+        Dim shp As Object: Set shp = sld.Shapes(i)
+        If Left$(shp.Name, Len(tablePrefix)) = tablePrefix And _
+           shp.Name <> tablePrefix & "_1" Then
+            On Error Resume Next
+            Dim tbl As Object: Set tbl = shp.Table
+            If Not tbl Is Nothing Then
+                If tbl.Columns.Count = nCols Then
+                    For c = 1 To nCols
+                        tbl.Columns(c).Width = refColW(c)
+                    Next c
+                    Debug.Print "  [SYNC cols] " & shp.Name
+                End If
+            End If
+            On Error GoTo 0
+        End If
+    Next i
 End Sub
 
 ' --- DataTable ----------------------------------------------------------------
