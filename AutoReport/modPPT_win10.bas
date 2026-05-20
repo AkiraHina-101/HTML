@@ -31,12 +31,11 @@ Public Sub ExportPPT_ALL()
 End Sub
 
 Public Sub ExportPPT_OnlyPage()
-    Dim ans As String
-    ans = InputBox("Enter slide number to export:", "Export Single Page", "1")
-    If Len(Trim$(ans)) = 0 Then Exit Sub
-    If Not IsNumeric(ans) Then MsgBox "Invalid slide number.", vbExclamation: Exit Sub
-    Dim pg As Long: pg = CLng(ans)
-    If pg < 1 Then MsgBox "Slide number must be >= 1.", vbExclamation: Exit Sub
+    Dim pg As Long: pg = SlideIdxFromConfig(ActiveSheet.Name)
+    If pg < 1 Then
+        MsgBox "Sheet '" & ActiveSheet.Name & "' is not mapped to any slide.", vbExclamation
+        Exit Sub
+    End If
     RunExport pg
 End Sub
 
