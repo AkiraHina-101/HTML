@@ -139,6 +139,8 @@ Private Sub ExportSheetSafe(ByVal ws As Worksheet, ByVal pres As Object, _
     For Each shp In ws.Shapes
         If Left$(shp.Name, 5) = "Line_" Then
             ExportLineShape shp, sld, bounds, slideW, slideH, lineWtScale
+        ElseIf Left$(shp.Name, 8) = "PPT_Pic_" Then
+            ExportPicShape shp, sld, bounds, slideW, slideH
         ElseIf Left$(shp.Name, 11) = "PPT_Label1_" Then
             ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz1
         ElseIf Left$(shp.Name, 11) = "PPT_Label2_" Then
@@ -314,6 +316,56 @@ Private Sub ExportLineShape(ByVal xlShp As Shape, ByVal sld As Object, _
             pptShp.Name               = xlShp.Name
         End If
     End If
+    On Error GoTo 0
+
+    Debug.Print "  [OK] " & xlShp.Name & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
+                " W=" & Pt(pptW) & " H=" & Pt(pptH)
+End Sub
+
+' --- Picture shapes (PPT_Pic_) ------------------------------------------------
+' CopyPicture + PasteSpecial(EMF) then position/resize to match Excel scale.
+Private Sub ExportPicShape(ByVal xlShp As Shape, ByVal sld As Object, _
+                            ByVal bounds As Range, ByVal slideW As Double, _
+                            ByVal slideH As Double)
+    DeleteByName sld, xlShp.Name
+
+    Dim scaleX As Double: scaleX = slideW / bounds.Width
+    Dim scaleY As Double: scaleY = slideH / bounds.Height
+    Dim pptL   As Double: pptL = (xlShp.Left - bounds.Left) * scaleX
+    Dim pptT   As Double: pptT = (xlShp.Top  - bounds.Top)  * scaleY
+    Dim pptW   As Double: pptW = xlShp.Width  * scaleX
+    Dim pptH   As Double: pptH = xlShp.Height * scaleY
+
+    Dim pptShp   As Object
+    Dim pasteErr As Long
+    Dim attempt  As Long
+    On Error Resume Next
+    For attempt = 1 To 3
+        xlShp.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+        DoEvents
+        Err.Clear
+        Set pptShp = sld.Shapes.PasteSpecial(DataType:=ppPasteEnhancedMetafile)
+        pasteErr = Err.Number
+        Application.CutCopyMode = False
+        If pasteErr = 0 And Not pptShp Is Nothing Then Exit For
+        Debug.Print "  [RETRY " & attempt & "] " & xlShp.Name & " err=" & pasteErr
+        DoEvents
+    Next attempt
+    On Error GoTo 0
+
+    If pasteErr <> 0 Or pptShp Is Nothing Then
+        Debug.Print "  [ERR] ExportPicShape failed after 3 attempts: " & xlShp.Name
+        Exit Sub
+    End If
+
+    On Error Resume Next
+    Set pptShp = FirstShapeFromPaste(pptShp)
+    pptShp.LockAspectRatio = msoFalse
+    pptShp.Left   = pptL
+    pptShp.Top    = pptT
+    pptShp.Width  = pptW
+    pptShp.Height = pptH
+    pptShp.Name   = xlShp.Name
     On Error GoTo 0
 
     Debug.Print "  [OK] " & xlShp.Name & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
