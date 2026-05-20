@@ -22,9 +22,17 @@ Private Const xlPicture               As Long = -4147
 ' =============================================================================
 Public Sub ExportToPPT()
 ' =============================================================================
+    ' Save Application state
     Dim prevEvents As Boolean: prevEvents = Application.EnableEvents
-    Application.EnableEvents = False
-    On Error GoTo CleanFail
+    Dim prevScreen As Boolean: prevScreen = Application.ScreenUpdating
+    Dim prevAlerts As Boolean: prevAlerts = Application.DisplayAlerts
+    Dim prevCalc   As Long:    prevCalc   = Application.Calculation
+    Application.EnableEvents   = False
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts  = False
+    Application.Calculation    = xlCalculationManual
+
+    On Error GoTo FatalFail
 
     modConfig.InvalidateCache
 
@@ -53,77 +61,92 @@ Public Sub ExportToPPT()
         cfgWs.Range("N1").Value2 = slideW / slideH
     End If
 
+    ' Per-sheet export - each sheet has its own error scope, so a failure in
+    ' one sheet does not skip remaining items of other sheets
     Dim ws As Worksheet
     For Each ws In ThisWorkbook.Worksheets
-        Dim slideIdx As Long: slideIdx = SlideIdxFromConfig(ws.Name)
-        If slideIdx < 1 Or slideIdx > pres.Slides.Count Then GoTo NextSheet
-
-        Dim bounds As Range: Set bounds = modLayout.FindNamedRange(ws, boundsName)
-        If bounds Is Nothing Then
-            Debug.Print "  [SKIP] " & ws.Name & ": " & boundsName & " not found"
-            GoTo NextSheet
-        End If
-        Debug.Print "--- " & ws.Name & " -> slide " & slideIdx & " ---"
-
-        Dim sld As Object: Set sld = pres.Slides(slideIdx)
-        On Error Resume Next
-        pres.Application.ActiveWindow.View.GotoSlide slideIdx
-        On Error GoTo CleanFail
-
-        ' --- Tables ---
-        Dim nm      As Name
-        Dim nmLocal As String
-        Dim dtRng   As Range
-        For Each nm In ThisWorkbook.Names
-            nmLocal = nm.Name
-            If InStr(nmLocal, "!") > 0 Then nmLocal = Mid$(nmLocal, InStr(nmLocal, "!") + 1)
-            If Left$(nmLocal, Len(tableName)) = tableName Then
-                Set dtRng = Nothing
-                On Error Resume Next
-                Set dtRng = nm.RefersToRange
-                On Error GoTo CleanFail
-                If Not dtRng Is Nothing Then
-                    If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
-                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH, tblFontSz
-                    End If
-                End If
-            End If
-        Next nm
-
-        ' --- Charts ---
-        Dim co As ChartObject
-        For Each co In ws.ChartObjects
-            ExportChart co, sld, bounds, chartPfx, slideW, slideH
-        Next co
-
-        ' --- Lines ---
-        Dim lineShp As Shape
-        For Each lineShp In ws.Shapes
-            If Left$(lineShp.Name, 5) = "Line_" Then
-                ExportLineShape lineShp, sld, bounds, slideW, slideH, lineWtScale
-            End If
-        Next lineShp
-
-        ' --- Labels and Headers ---
-        Dim labelShp As Shape
-        For Each labelShp In ws.Shapes
-            If Left$(labelShp.Name, 9) = "LabelOut_" Or Left$(labelShp.Name, 10) = "PPT_Label_" Then
-                ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, lblFontSz
-            ElseIf Left$(labelShp.Name, 11) = "PPT_Header_" Then
-                ExportHeaderShape labelShp, sld, hdrFontSz
-            End If
-        Next labelShp
-
-NextSheet:
+        ExportSheetSafe ws, pres, boundsName, tableName, chartPfx, _
+                        tblFont, tblFontSz, lblFontSz, hdrFontSz, lineWtScale, _
+                        slideW, slideH
     Next ws
     Debug.Print "=== ExportToPPT done ==="
 
 CleanExit:
-    Application.EnableEvents = prevEvents
+    Application.Calculation    = prevCalc
+    Application.DisplayAlerts  = prevAlerts
+    Application.ScreenUpdating = prevScreen
+    Application.EnableEvents   = prevEvents
     Exit Sub
-CleanFail:
-    Debug.Print "[ERROR] " & ws.Name & ": " & Err.Number & " - " & Err.Description
-    Resume NextSheet
+
+FatalFail:
+    Debug.Print "[FATAL ExportToPPT] " & Err.Number & " - " & Err.Description
+    Resume CleanExit
+End Sub
+
+' --- Per-sheet export with isolated error handler ----------------------------
+' Logs the failure and returns, so the outer loop continues to the next sheet.
+Private Sub ExportSheetSafe(ByVal ws As Worksheet, ByVal pres As Object, _
+                              ByVal boundsName As String, ByVal tableName As String, _
+                              ByVal chartPfx As String, ByVal tblFont As String, _
+                              ByVal tblFontSz As Double, ByVal lblFontSz As Double, _
+                              ByVal hdrFontSz As Double, ByVal lineWtScale As Double, _
+                              ByVal slideW As Double, ByVal slideH As Double)
+    On Error GoTo SheetFail
+
+    Dim slideIdx As Long: slideIdx = SlideIdxFromConfig(ws.Name)
+    If slideIdx < 1 Or slideIdx > pres.Slides.Count Then Exit Sub
+
+    Dim bounds As Range: Set bounds = modLayout.FindNamedRange(ws, boundsName)
+    If bounds Is Nothing Then
+        Debug.Print "  [SKIP] " & ws.Name & ": " & boundsName & " not found"
+        Exit Sub
+    End If
+    Debug.Print "--- " & ws.Name & " -> slide " & slideIdx & " ---"
+
+    Dim sld As Object: Set sld = pres.Slides(slideIdx)
+    On Error Resume Next
+    pres.Application.ActiveWindow.View.GotoSlide slideIdx
+    On Error GoTo SheetFail
+
+    ' --- Tables ---
+    Dim nm As Name, nmLocal As String, dtRng As Range
+    For Each nm In ThisWorkbook.Names
+        nmLocal = nm.Name
+        If InStr(nmLocal, "!") > 0 Then nmLocal = Mid$(nmLocal, InStr(nmLocal, "!") + 1)
+        If Left$(nmLocal, Len(tableName)) = tableName Then
+            Set dtRng = Nothing
+            On Error Resume Next
+            Set dtRng = nm.RefersToRange
+            On Error GoTo SheetFail
+            If Not dtRng Is Nothing Then
+                If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
+                    ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH, tblFontSz
+                End If
+            End If
+        End If
+    Next nm
+
+    ' --- Charts ---
+    Dim co As ChartObject
+    For Each co In ws.ChartObjects
+        ExportChart co, sld, bounds, chartPfx, slideW, slideH
+    Next co
+
+    ' --- Lines / Labels / Headers (single pass over ws.Shapes) ---
+    Dim shp As Shape
+    For Each shp In ws.Shapes
+        If Left$(shp.Name, 5) = "Line_" Then
+            ExportLineShape shp, sld, bounds, slideW, slideH, lineWtScale
+        ElseIf Left$(shp.Name, 9) = "LabelOut_" Or Left$(shp.Name, 10) = "PPT_Label_" Then
+            ExportLabelShape shp, sld, bounds, slideW, slideH, tblFont, lblFontSz
+        ElseIf Left$(shp.Name, 11) = "PPT_Header_" Then
+            ExportHeaderShape shp, sld, hdrFontSz
+        End If
+    Next shp
+    Exit Sub
+
+SheetFail:
+    Debug.Print "[ERROR sheet=" & ws.Name & "] " & Err.Number & " - " & Err.Description
 End Sub
 
 ' --- DataTable ----------------------------------------------------------------
