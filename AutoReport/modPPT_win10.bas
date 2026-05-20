@@ -84,9 +84,7 @@ Public Sub ExportToPPT()
         Set firstRng = ThisWorkbook.Names(tableName & "_1").RefersToRange
         On Error GoTo CleanFail
         If Not firstRng Is Nothing Then
-            If StrComp(firstRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
-                maxTblW = firstRng.Width * scaleXt
-            End If
+            maxTblW = firstRng.Width * scaleXt
         End If
         Debug.Print "  [TBL sharedW from _1] " & Pt(maxTblW)
 
