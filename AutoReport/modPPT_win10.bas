@@ -145,15 +145,11 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
     Dim nCols     As Long:  nCols = refTbl.Columns.Count
     Dim refTotalW As Double: refTotalW = 0
     Dim refColW() As Double: ReDim refColW(1 To nCols)
-    Dim refFontSz As Double: refFontSz = 0
     Dim c As Long, r As Long
     For c = 1 To nCols
         refColW(c) = refTbl.Columns(c).Width
         refTotalW  = refTotalW + refColW(c)
     Next c
-    On Error Resume Next
-    refFontSz = refTbl.Cell(1, 1).Shape.TextFrame.TextRange.Font.Size
-    On Error GoTo 0
 
     ' Apply to all other matching shapes
     Dim i As Long
@@ -174,15 +170,7 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
                         tbl.Columns(c).Width = thisTotalW * (refColW(c) / refTotalW)
                     Next c
                 End If
-                ' Sync font size for all cells
-                If refFontSz > 0 Then
-                    For r = 1 To tbl.Rows.Count
-                        For c = 1 To tbl.Columns.Count
-                            tbl.Cell(r, c).Shape.TextFrame.TextRange.Font.Size = refFontSz
-                        Next c
-                    Next r
-                End If
-                Debug.Print "  [SYNC] " & shp.Name & " fontSize=" & refFontSz
+                Debug.Print "  [SYNC cols] " & shp.Name
             End If
             On Error GoTo 0
         End If
@@ -218,6 +206,28 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     shp.Top             = pptT
     shp.Width = pptW:   shp.Height = pptH
     shp.Width = pptW:   shp.Height = pptH
+
+    ' Apply font size: Excel range font * scaleY, applied to all cells
+    Dim xlFontSz As Double
+    On Error Resume Next
+    xlFontSz = rng.Cells(1, 1).Font.Size
+    On Error GoTo 0
+    If xlFontSz > 0 Then
+        Dim targetSz As Double: targetSz = xlFontSz * scaleY
+        Dim tbl As Object
+        On Error Resume Next
+        Set tbl = shp.Table
+        If Not tbl Is Nothing Then
+            Dim tr As Long, tc As Long
+            For tr = 1 To tbl.Rows.Count
+                For tc = 1 To tbl.Columns.Count
+                    tbl.Cell(tr, tc).Shape.TextFrame.TextRange.Font.Size = targetSz
+                Next tc
+            Next tr
+        End If
+        On Error GoTo 0
+        Debug.Print "  [FONT] " & shapeName & " xlSz=" & xlFontSz & " -> pptSz=" & Format$(targetSz, "0.0")
+    End If
 
     Debug.Print "  [OK] " & shapeName & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
                 " W=" & Pt(pptW) & " H=" & Pt(pptH)
