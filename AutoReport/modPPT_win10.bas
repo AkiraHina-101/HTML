@@ -529,7 +529,8 @@ Public Sub CreateDataTableRanges()
         If cancelErr <> 0 Or rng Is Nothing Then Exit Do
 
         Dim nmName As String: nmName = prefix & idx
-        ThisWorkbook.Names.Add Name:=nmName, RefersTo:=rng
+        ' Sheet-scoped name so same name on different sheets does not overwrite each other
+        rng.Parent.Names.Add Name:=nmName, RefersTo:=rng
         Debug.Print "[OK] " & nmName & " = " & rng.Address(External:=True)
 
         idx = idx + 1
