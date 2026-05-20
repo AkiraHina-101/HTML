@@ -33,8 +33,6 @@ Public Sub ExportToPPT()
     Dim tblFont     As String: tblFont = modConfig.CfgStr("DataTableFontName", "")
     Dim tblFontSz   As Double: tblFontSz = modConfig.CfgDbl("DataTableFontSize", 0)
     Dim lblFontSz   As Double: lblFontSz = modConfig.CfgDbl("LabelFontSize", 0)
-    Dim chartScale  As Double: chartScale = modConfig.CfgDbl("ChartScale", 1)
-    If chartScale <= 0 Then chartScale = 1
     Dim lineWtScale As Double: lineWtScale = modConfig.CfgDbl("LineWeightScale", 1)
     If lineWtScale <= 0 Then lineWtScale = 1
 
@@ -79,20 +77,20 @@ Public Sub ExportToPPT()
 
         Dim co As chartObject
         For Each co In ws.chartObjects
-            ExportChart co, sld, bounds, chartPfx, slideW, slideH, chartScale
+            ExportChart co, sld, bounds, chartPfx, slideW, slideH
         Next co
 
         Dim lineShp As Shape
         For Each lineShp In ws.Shapes
             If Left$(lineShp.Name, 5) = "Line_" Then
-                ExportLineShape lineShp, sld, bounds, slideW, slideH, chartScale, lineWtScale
+                ExportLineShape lineShp, sld, bounds, slideW, slideH, lineWtScale
             End If
         Next lineShp
 
         Dim labelShp As Shape
         For Each labelShp In ws.Shapes
             If Left$(labelShp.Name, 9) = "LabelOut_" Or Left$(labelShp.Name, 10) = "PPT_Label_" Then
-                ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, lblFontSz, chartScale
+                ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, lblFontSz
             End If
         Next labelShp
 
@@ -157,8 +155,7 @@ End Sub
 ' --- Charts -------------------------------------------------------------------
 Private Sub ExportChart(ByVal co As chartObject, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal prefix As String, _
-                         ByVal slideW As Double, ByVal slideH As Double, _
-                         ByVal chartScale As Double)
+                         ByVal slideW As Double, ByVal slideH As Double)
     Dim sName As String
     sName = prefix & co.Name
     DeleteByName sld, sName
@@ -166,8 +163,8 @@ Private Sub ExportChart(ByVal co As chartObject, ByVal sld As Object, _
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim pptL As Double: pptL = (co.Left - bounds.Left) * scaleX
     Dim pptT As Double: pptT = (co.Top - bounds.Top) * scaleX
-    Dim pptW As Double: pptW = co.Width * scaleX * chartScale
-    Dim pptH As Double: pptH = co.Height * scaleX * chartScale
+    Dim pptW As Double: pptW = co.Width * scaleX
+    Dim pptH As Double: pptH = co.Height * scaleX
 
     Dim pptShp As Object
     Dim pasteErr As Long
@@ -217,15 +214,14 @@ End Function
 ' Oval markers    : AddShape (exact fill color, no outline).
 Private Sub ExportLineShape(ByVal xlShp As Shape, ByVal sld As Object, _
                              ByVal bounds As Range, ByVal slideW As Double, _
-                             ByVal slideH As Double, ByVal chartScale As Double, _
-                             ByVal lineWtScale As Double)
+                             ByVal slideH As Double, ByVal lineWtScale As Double)
     DeleteByName sld, xlShp.Name
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim pptL   As Double: pptL = (xlShp.Left - bounds.Left) * scaleX
     Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleX
-    Dim pptW   As Double: pptW = xlShp.Width * scaleX * chartScale
-    Dim pptH   As Double: pptH = xlShp.Height * scaleX * chartScale
+    Dim pptW   As Double: pptW = xlShp.Width * scaleX
+    Dim pptH   As Double: pptH = xlShp.Height * scaleX
 
     Dim pptShp As Object
     On Error Resume Next
@@ -320,14 +316,14 @@ End Sub
 Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
                               ByVal bounds As Range, ByVal slideW As Double, _
                               ByVal slideH As Double, ByVal fontName As String, _
-                              ByVal fontSize As Double, ByVal chartScale As Double)
+                              ByVal fontSize As Double)
     DeleteByName sld, xlShp.Name
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim pptL   As Double: pptL = (xlShp.Left - bounds.Left) * scaleX
     Dim pptT   As Double: pptT = (xlShp.Top - bounds.Top) * scaleX
-    Dim pptW   As Double: pptW = xlShp.Width * scaleX * chartScale
-    Dim pptH   As Double: pptH = xlShp.Height * scaleX * chartScale
+    Dim pptW   As Double: pptW = xlShp.Width * scaleX
+    Dim pptH   As Double: pptH = xlShp.Height * scaleX
 
     xlShp.CopyPicture Appearance:=xlScreen, Format:=xlPicture
     DoEvents
