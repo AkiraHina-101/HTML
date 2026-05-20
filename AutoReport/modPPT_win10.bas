@@ -89,7 +89,6 @@ Public Sub ExportToPPT()
                 End If
             End If
         Next nm
-        SyncTableColumns sld, tableName
 
         ' --- Charts ---
         Dim co As ChartObject
@@ -127,74 +126,15 @@ CleanFail:
     Resume NextSheet
 End Sub
 
-' --- Sync DataTable column width ratios to match _1 ---------------------------
-' Only column widths are synced (proportional to _1). Row heights and total W
-' are preserved per-table to avoid overlap with adjacent shapes.
-Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
-    Dim refShp As Object
-    On Error Resume Next
-    Set refShp = sld.Shapes(tablePrefix & "_1")
-    On Error GoTo 0
-    If refShp Is Nothing Then Exit Sub
-
-    Dim refTbl As Object
-    On Error Resume Next
-    Set refTbl = refShp.Table
-    On Error GoTo 0
-    If refTbl Is Nothing Then Exit Sub
-
-    Dim nCols     As Long:   nCols = refTbl.Columns.Count
-    Dim nRows     As Long:   nRows = refTbl.Rows.Count
-    Dim refTotalW As Double: refTotalW = 0
-    Dim refTotalH As Double: refTotalH = 0
-    Dim refColW() As Double: ReDim refColW(1 To nCols)
-    Dim refRowH() As Double: ReDim refRowH(1 To nRows)
-    Dim c As Long, r As Long
-    For c = 1 To nCols
-        refColW(c) = refTbl.Columns(c).Width
-        refTotalW  = refTotalW + refColW(c)
-    Next c
-    For r = 1 To nRows
-        refRowH(r) = refTbl.Rows(r).Height
-        refTotalH  = refTotalH + refRowH(r)
-    Next r
-    If refTotalW = 0 Then Exit Sub
-
-    Dim i As Long
-    For i = 1 To sld.Shapes.Count
-        Dim shp As Object: Set shp = sld.Shapes(i)
-        If Left$(shp.Name, Len(tablePrefix)) = tablePrefix And _
-           shp.Name <> tablePrefix & "_1" Then
-            On Error Resume Next
-            Dim tbl As Object: Set tbl = shp.Table
-            If Not tbl Is Nothing Then
-                ' Apply exact dimensions from _1 (absolute col widths, row heights, total W)
-                If tbl.Columns.Count = nCols Then
-                    shp.Width = refTotalW
-                    For c = 1 To nCols
-                        tbl.Columns(c).Width = refColW(c)
-                    Next c
-                End If
-                If tbl.Rows.Count = nRows Then
-                    For r = 1 To nRows
-                        tbl.Rows(r).Height = refRowH(r)
-                    Next r
-                End If
-                Debug.Print "  [SYNC] " & shp.Name
-            End If
-            On Error GoTo 0
-        End If
-    Next i
-End Sub
-
 ' --- DataTable ----------------------------------------------------------------
+' Paste as HTML then resize columns/rows to match Excel range scaled to slide.
 Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal shapeName As String, _
                          ByVal slideW As Double, ByVal slideH As Double, _
                          Optional ByVal cfgFontSz As Double = 0)
     DeleteByName sld, shapeName
 
-    ' Normalize zoom to 100% so HTML pixel dimensions are consistent across sheets
+    ' Normalize zoom so HTML pixel dimensions are consistent across sheets
     Dim prevZoom As Long
     On Error Resume Next
     prevZoom = Application.ActiveWindow.Zoom
@@ -212,48 +152,46 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     Application.CutCopyMode = False
     If shp Is Nothing Then Debug.Print "  [ERR] " & shapeName & " paste failed": Exit Sub
 
+    ' Target position and size from Excel range scaled to slide
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
-    Dim pptL   As Double: pptL = (rng.Left - bounds.Left) * scaleX
-    Dim pptT   As Double: pptT = (rng.Top  - bounds.Top)  * scaleY
-    Dim pptW   As Double: pptW = rng.Width * scaleX
+    Dim pptL   As Double: pptL = (rng.Left  - bounds.Left) * scaleX
+    Dim pptT   As Double: pptT = (rng.Top   - bounds.Top)  * scaleY
+    Dim pptW   As Double: pptW = rng.Width  * scaleX
+    Dim pptH   As Double: pptH = rng.Height * scaleY
 
     shp.Name            = shapeName
     shp.LockAspectRatio = msoFalse
     shp.Left            = pptL
     shp.Top             = pptT
-    shp.Width           = pptW
-    ' Height is not forced: PPT table row min-height can exceed the scaled value,
-    ' forcing it would push adjacent shapes out of position.
 
-    ' Apply font size: config value if set, else xlFontSz * scaleY
-    Dim xlFontSz As Double
+    ' Scale each column and row to match target dimensions exactly
+    Dim tbl As Object
     On Error Resume Next
-    xlFontSz = rng.Cells(1, 1).Font.Size
+    Set tbl = shp.Table
     On Error GoTo 0
-    Dim targetSz As Double
-    If cfgFontSz > 0 Then
-        targetSz = cfgFontSz
-    ElseIf xlFontSz > 0 Then
-        targetSz = xlFontSz * scaleY
-    End If
-    If targetSz > 0 Then
-        Dim tbl As Object
-        On Error Resume Next
-        Set tbl = shp.Table
-        If Not tbl Is Nothing Then
+    If Not tbl Is Nothing Then
+        Dim c As Long, r As Long
+        Dim wRatio As Double: wRatio = pptW / shp.Width
+        Dim hRatio As Double: hRatio = pptH / shp.Height
+        For c = 1 To tbl.Columns.Count
+            tbl.Columns(c).Width = tbl.Columns(c).Width * wRatio
+        Next c
+        For r = 1 To tbl.Rows.Count
+            tbl.Rows(r).Height = tbl.Rows(r).Height * hRatio
+        Next r
+        If cfgFontSz > 0 Then
             Dim tr As Long, tc As Long
             For tr = 1 To tbl.Rows.Count
                 For tc = 1 To tbl.Columns.Count
-                    tbl.Cell(tr, tc).Shape.TextFrame.TextRange.Font.Size = targetSz
+                    tbl.Cell(tr, tc).Shape.TextFrame.TextRange.Font.Size = cfgFontSz
                 Next tc
             Next tr
         End If
-        On Error GoTo 0
     End If
 
     Debug.Print "  [OK] " & shapeName & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
-                " W=" & Pt(pptW) & " fontSize=" & Pt(targetSz)
+                " W=" & Pt(pptW) & " H=" & Pt(pptH)
 End Sub
 
 ' --- Charts -------------------------------------------------------------------
