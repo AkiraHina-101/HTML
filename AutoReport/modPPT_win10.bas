@@ -418,7 +418,7 @@ Private Function Pt(ByVal v As Double) As String
     Pt = Format$(v, "0.0")
 End Function
 
-' --- Tạo PPT_XL_DataTable_N liên tiếp bằng InputBox chọn range ---
+' --- Create PPT_XL_DataTable_N named ranges via repeated InputBox ---
 Public Sub CreateDataTableRanges()
     Dim prefix As String: prefix = "PPT_XL_DataTable_"
     Dim idx    As Long:   idx = 1
@@ -428,8 +428,8 @@ Public Sub CreateDataTableRanges()
         Set rng = Nothing
         On Error Resume Next
         Set rng = Application.InputBox( _
-            Prompt:="Chọn range cho " & prefix & idx & vbCrLf & "(Cancel để kết thúc)", _
-            Title:="Tạo DataTable " & idx, _
+            Prompt:="Select range for " & prefix & idx & vbCrLf & "(Cancel to stop)", _
+            Title:="Create DataTable " & idx, _
             Type:=8)
         Dim cancelErr As Long: cancelErr = Err.Number
         On Error GoTo 0
@@ -443,8 +443,8 @@ Public Sub CreateDataTableRanges()
         idx = idx + 1
     Loop
 
-    MsgBox "Đã tạo " & (idx - 1) & " named range." & vbCrLf & _
-           "Prefix: " & prefix & "1 → " & prefix & (idx - 1), vbInformation, "Hoàn tất"
+    MsgBox "Created " & (idx - 1) & " named range(s)." & vbCrLf & _
+           prefix & "1 to " & prefix & (idx - 1), vbInformation, "Done"
 End Sub
 
 Private Function SlideIdxFromConfig(ByVal sheetName As String) As Long
