@@ -415,17 +415,19 @@ End Sub
 ' If placeholder not found, skip silently.
 Private Sub ExportHeaderShape(ByVal xlShp As Shape, ByVal sld As Object, _
                                ByVal fontSize As Double)
-    ' Parse placeholder index from suffix (PPT_Header_1 -> 1)
-    Dim suffix  As String: suffix = Mid$(xlShp.Name, 12)   ' after "PPT_Header_"
-    Dim phIdx   As Long
-    If IsNumeric(suffix) Then phIdx = CLng(suffix) Else phIdx = 1
-
+    ' Find placeholder whose Name matches the Excel shape name
     Dim ph As Object
-    On Error Resume Next
-    Set ph = sld.Placeholders(phIdx)
-    On Error GoTo 0
+    Dim i  As Long
+    For i = 1 To sld.Shapes.Count
+        If StrComp(sld.Shapes(i).Name, xlShp.Name, vbTextCompare) = 0 Then
+            On Error Resume Next
+            Set ph = sld.Shapes(i)
+            On Error GoTo 0
+            Exit For
+        End If
+    Next i
     If ph Is Nothing Then
-        Debug.Print "  [SKIP] " & xlShp.Name & ": no placeholder " & phIdx
+        Debug.Print "  [SKIP] " & xlShp.Name & ": no matching placeholder"
         Exit Sub
     End If
 
