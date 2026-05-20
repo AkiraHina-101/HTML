@@ -20,8 +20,30 @@ Private Const xlScreen                As Long = 1
 Private Const xlPicture               As Long = -4147
 
 ' =============================================================================
-Public Sub ExportToPPT()
+' Public entry points
 ' =============================================================================
+Public Sub ExportToPPT()
+    RunExport 0
+End Sub
+
+Public Sub ExportPPT_ALL()
+    RunExport 0
+End Sub
+
+Public Sub ExportPPT_OnlyPage()
+    Dim ans As String
+    ans = InputBox("Enter slide number to export:", "Export Single Page", "1")
+    If Len(Trim$(ans)) = 0 Then Exit Sub
+    If Not IsNumeric(ans) Then MsgBox "Invalid slide number.", vbExclamation: Exit Sub
+    Dim pg As Long: pg = CLng(ans)
+    If pg < 1 Then MsgBox "Slide number must be >= 1.", vbExclamation: Exit Sub
+    RunExport pg
+End Sub
+
+' =============================================================================
+' Core export — filterSlide = 0 exports all sheets, > 0 exports only that slide
+' =============================================================================
+Private Sub RunExport(ByVal filterSlide As Long)
     ' Save Application state
     Dim prevEvents As Boolean: prevEvents = Application.EnableEvents
     Dim prevScreen As Boolean: prevScreen = Application.ScreenUpdating
@@ -49,9 +71,12 @@ Public Sub ExportToPPT()
 
     Dim pres As Object: Set pres = OpenPres()
     If pres Is Nothing Then
-        Debug.Print "ExportToPPT: cannot open presentation": GoTo CleanExit
+        Debug.Print "RunExport: cannot open presentation": GoTo CleanExit
     End If
-    Debug.Print "=== ExportToPPT start: " & pres.Name & " (" & pres.Slides.Count & " slides) ==="
+
+    Dim label As String
+    label = IIf(filterSlide = 0, "ALL", "slide " & filterSlide)
+    Debug.Print "=== ExportToPPT start [" & label & "]: " & pres.Name & " ==="
 
     Dim slideW As Double: slideW = pres.PageSetup.SlideWidth
     Dim slideH As Double: slideH = pres.PageSetup.SlideHeight
@@ -62,15 +87,17 @@ Public Sub ExportToPPT()
         cfgWs.Range("N1").Value2 = slideW / slideH
     End If
 
-    ' Per-sheet export - each sheet has its own error scope, so a failure in
-    ' one sheet does not skip remaining items of other sheets
+    ' Each sheet has its own error scope via ExportSheetSafe.
+    ' filterSlide > 0: only process sheets mapped to that slide index.
     Dim ws As Worksheet
     For Each ws In ThisWorkbook.Worksheets
-        ExportSheetSafe ws, pres, boundsName, tableName, chartPfx, _
-                        tblFont, tblFontSz, lblFontSz1, lblFontSz2, hdrFontSz, lineWtScale, _
-                        slideW, slideH
+        If filterSlide = 0 Or SlideIdxFromConfig(ws.Name) = filterSlide Then
+            ExportSheetSafe ws, pres, boundsName, tableName, chartPfx, _
+                            tblFont, tblFontSz, lblFontSz1, lblFontSz2, hdrFontSz, lineWtScale, _
+                            slideW, slideH
+        End If
     Next ws
-    Debug.Print "=== ExportToPPT done ==="
+    Debug.Print "=== ExportToPPT done [" & label & "] ==="
 
 CleanExit:
     Application.Calculation    = prevCalc
@@ -80,7 +107,7 @@ CleanExit:
     Exit Sub
 
 FatalFail:
-    Debug.Print "[FATAL ExportToPPT] " & Err.Number & " - " & Err.Description
+    Debug.Print "[FATAL RunExport] " & Err.Number & " - " & Err.Description
     Resume CleanExit
 End Sub
 
