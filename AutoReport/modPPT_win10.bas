@@ -352,7 +352,7 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
         Dim xlFont As Font: Set xlFont = xlTf.Characters(i, 1).Font
         With pptTf.TextRange.Characters(i, 1).Font
             If Len(fontName) > 0 Then .Name = fontName Else .Name = xlFont.Name
-            If fontSize > 0 Then .Size = fontSize Else .Size = xlFont.Size
+            .Size = xlFont.Size * scaleY
             .Color.RGB = xlFont.Color
             .Bold = (xlFont.Bold = True)
             .Italic = (xlFont.Italic = True)
