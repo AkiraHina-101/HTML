@@ -339,33 +339,78 @@ Private Sub ExportLabelShape(ByVal xlShp As Shape, ByVal sld As Object, _
         Exit Sub
     End If
 
-    ' â”€â”€ Copy text vÃ  font tá»« Excel TextFrame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    On Error Resume Next
+
     Dim xlTf  As TextFrame: Set xlTf = xlShp.TextFrame
     Dim pptTf As Object:    Set pptTf = pptShp.TextFrame
 
-    On Error Resume Next
+    ' â”€â”€ Text content (tá»«ng character run) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     pptTf.TextRange.Text = xlTf.Characters.Text
 
-    Dim fName As String: fName = fontName
-    Dim fSize As Double: fSize = fontSize
-    If Len(fName) = 0 Then fName = xlTf.Characters.Font.Name
-    If fSize <= 0 Then fSize = xlTf.Characters.Font.Size
+    Dim i As Long
+    For i = 1 To xlTf.Characters.count
+        Dim xlFont As Font: Set xlFont = xlTf.Characters(i, 1).Font
+        With pptTf.TextRange.Characters(i, 1).Font
+            If Len(fontName) > 0 Then .Name = fontName Else .Name = xlFont.Name
+            If fontSize > 0 Then .Size = fontSize Else .Size = xlFont.Size
+            .Color.RGB = xlFont.Color
+            .Bold = (xlFont.Bold = True)
+            .Italic = (xlFont.Italic = True)
+            .Underline = (xlFont.Underline <> xlUnderlineStyleNone)
+        End With
+    Next i
 
-    With pptTf.TextRange.Font
-        If Len(fName) > 0 Then .Name = fName
-        If fSize > 0 Then .Size = fSize
-        .Color.RGB = xlTf.Characters.Font.Color
-        .Bold = xlTf.Characters.Font.Bold
-    End With
+    ' â”€â”€ Paragraph alignment (H) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' Excel: xlLeft=-4131, xlCenter=-4108, xlRight=-4152, xlJustify=-4130
+    ' PPT  : ppAlignLeft=1, ppAlignCenter=2, ppAlignRight=3, ppAlignJustify=4
+    Dim hAlign As Long
+    Select Case xlTf.HorizontalAlignment
+        Case -4108: hAlign = 2  ' xlCenter â†’ ppAlignCenter
+        Case -4152: hAlign = 3  ' xlRight  â†’ ppAlignRight
+        Case -4130: hAlign = 4  ' xlJustify â†’ ppAlignJustify
+        Case Else:  hAlign = 1  ' xlLeft   â†’ ppAlignLeft
+    End Select
+    pptTf.TextRange.ParagraphFormat.Alignment = hAlign
 
-    ' â”€â”€ Background fill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    If xlShp.Fill.Visible Then
+    ' â”€â”€ Vertical anchor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    ' Excel: xlTop=-4160, xlCenter=-4108, xlBottom=-4107
+    ' PPT  : msoAnchorTop=1, msoAnchorMiddle=3, msoAnchorBottom=4
+    Dim vAlign As Long
+    Select Case xlTf.VerticalAlignment
+        Case -4108: vAlign = 3  ' xlCenter â†’ msoAnchorMiddle
+        Case -4107: vAlign = 4  ' xlBottom â†’ msoAnchorBottom
+        Case Else:  vAlign = 1  ' xlTop    â†’ msoAnchorTop
+    End Select
+    pptTf.VerticalAnchor = vAlign
+
+    ' â”€â”€ Word wrap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    pptTf.WordWrap = xlTf.WordWrap
+
+    ' â”€â”€ Margins â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    pptTf.MarginLeft = xlTf.MarginLeft
+    pptTf.MarginRight = xlTf.MarginRight
+    pptTf.MarginTop = xlTf.MarginTop
+    pptTf.MarginBottom = xlTf.MarginBottom
+
+    ' â”€â”€ Fill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    If xlShp.Fill.Visible = msoTrue Then
+        pptShp.Fill.Solid
         pptShp.Fill.ForeColor.RGB = xlShp.Fill.ForeColor.RGB
+        pptShp.Fill.Transparency = xlShp.Fill.Transparency
     Else
         pptShp.Fill.Visible = msoFalse
     End If
 
-    pptShp.Line.Visible = msoFalse
+    ' â”€â”€ Border (Line) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    If xlShp.Line.Visible = msoTrue Then
+        pptShp.Line.Visible = msoTrue
+        pptShp.Line.ForeColor.RGB = xlShp.Line.ForeColor.RGB
+        pptShp.Line.Weight = xlShp.Line.Weight
+        pptShp.Line.DashStyle = XlDashToMso(xlShp.Line.DashStyle)
+    Else
+        pptShp.Line.Visible = msoFalse
+    End If
+
     pptShp.Name = xlShp.Name
     On Error GoTo 0
 
