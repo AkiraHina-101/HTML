@@ -202,10 +202,10 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
-    Dim pptL   As Double: pptL = (rng.Left              - bounds.Left) * scaleX
-    Dim pptT   As Double: pptT = (rng.Top               - bounds.Top)  * scaleY
-    Dim pptW   As Double: pptW = (rng.Left + rng.Width  - bounds.Left) * scaleX - pptL
-    Dim pptH   As Double: pptH = (rng.Top  + rng.Height - bounds.Top)  * scaleY - pptT
+    Dim pptL   As Double: pptL = (rng.Left - bounds.Left) * scaleX
+    Dim pptT   As Double: pptT = (rng.Top  - bounds.Top)  * scaleY
+    Dim pptW   As Double: pptW = rng.Width  * scaleX
+    Dim pptH   As Double: pptH = rng.Height * scaleY
     If sharedW > 0 Then pptW = sharedW
 
     shp.Name            = shapeName
