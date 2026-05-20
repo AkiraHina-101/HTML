@@ -44,14 +44,6 @@ Public Sub ExportToPPT()
     End If
     Debug.Print "=== ExportToPPT start: " & pres.Name & " (" & pres.Slides.Count & " slides) ==="
 
-    ' Minimize PPT window to suppress rendering during export
-    Dim pptApp As Object: Set pptApp = pres.Application
-    Dim prevPPTState As Long
-    On Error Resume Next
-    prevPPTState = pptApp.WindowState
-    pptApp.WindowState = 2  ' ppWindowMinimized
-    On Error GoTo 0
-
     Dim slideW As Double: slideW = pres.PageSetup.SlideWidth
     Dim slideH As Double: slideH = pres.PageSetup.SlideHeight
 
@@ -128,9 +120,6 @@ NextSheet:
     Debug.Print "=== ExportToPPT done ==="
 
 CleanExit:
-    On Error Resume Next
-    If Not pptApp Is Nothing Then pptApp.WindowState = prevPPTState
-    On Error GoTo 0
     Application.EnableEvents = prevEvents
     Exit Sub
 CleanFail:
