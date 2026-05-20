@@ -72,30 +72,23 @@ Public Sub ExportToPPT()
         pres.Application.ActiveWindow.View.GotoSlide slideIdx
         On Error GoTo CleanFail
 
-        ' Pass 1: find max scaled width across all DataTable ranges on this sheet
+        ' Pass 1: get width of the first DataTable (tableName & "_1") as shared width
         Dim nm      As Name
         Dim nmLocal As String
         Dim dtRng   As Range
         Dim maxTblW As Double: maxTblW = 0
         Dim scaleXt As Double: scaleXt = slideW / bounds.Width
-        For Each nm In ThisWorkbook.Names
-            nmLocal = nm.Name
-            If InStr(nmLocal, "!") > 0 Then nmLocal = Mid$(nmLocal, InStr(nmLocal, "!") + 1)
-            If Left$(nmLocal, Len(tableName)) = tableName Then
-                Set dtRng = Nothing
-                On Error Resume Next
-                Set dtRng = nm.RefersToRange
-                On Error GoTo CleanFail
-                If Not dtRng Is Nothing Then
-                    If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
-                        Dim tW As Double: tW = dtRng.Width * scaleXt
-                        If tW > maxTblW Then maxTblW = tW
-                        Debug.Print "  [TBL width] " & nmLocal & " = " & Pt(tW)
-                    End If
-                End If
+        Dim firstRng As Range
+        Set firstRng = Nothing
+        On Error Resume Next
+        Set firstRng = ThisWorkbook.Names(tableName & "_1").RefersToRange
+        On Error GoTo CleanFail
+        If Not firstRng Is Nothing Then
+            If StrComp(firstRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
+                maxTblW = firstRng.Width * scaleXt
             End If
-        Next nm
-        Debug.Print "  [TBL maxW] " & Pt(maxTblW)
+        End If
+        Debug.Print "  [TBL sharedW from _1] " & Pt(maxTblW)
 
         ' Pass 2: export each table using shared maxTblW
         For Each nm In ThisWorkbook.Names
