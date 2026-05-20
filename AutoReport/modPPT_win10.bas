@@ -141,22 +141,21 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
     On Error GoTo 0
     If refTbl Is Nothing Then Exit Sub
 
-    ' Read reference column widths and row heights
-    Dim nCols As Long: nCols = refTbl.Columns.Count
-    Dim nRows As Long: nRows = refTbl.Rows.Count
-    Dim refColW() As Double: ReDim refColW(1 To nCols)
-    Dim refRowH() As Double: ReDim refRowH(1 To nRows)
+    ' Read reference: column widths, font size from first cell
+    Dim nCols     As Long:  nCols = refTbl.Columns.Count
     Dim refTotalW As Double: refTotalW = 0
+    Dim refColW() As Double: ReDim refColW(1 To nCols)
+    Dim refFontSz As Double: refFontSz = 0
     Dim c As Long, r As Long
     For c = 1 To nCols
         refColW(c) = refTbl.Columns(c).Width
-        refTotalW = refTotalW + refColW(c)
+        refTotalW  = refTotalW + refColW(c)
     Next c
-    For r = 1 To nRows
-        refRowH(r) = refTbl.Rows(r).Height
-    Next r
+    On Error Resume Next
+    refFontSz = refTbl.Cell(1, 1).Shape.TextFrame.TextRange.Font.Size
+    On Error GoTo 0
 
-    ' Apply proportional column widths only (preserve each table's own total W and row heights)
+    ' Apply to all other matching shapes
     Dim i As Long
     For i = 1 To sld.Shapes.Count
         Dim shp As Object: Set shp = sld.Shapes(i)
@@ -165,18 +164,25 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
             On Error Resume Next
             Dim tbl As Object: Set tbl = shp.Table
             If Not tbl Is Nothing Then
+                ' Sync column width ratios
                 If tbl.Columns.Count = nCols And refTotalW > 0 Then
-                    ' Get this table's current total width
                     Dim thisTotalW As Double: thisTotalW = 0
                     For c = 1 To nCols
                         thisTotalW = thisTotalW + tbl.Columns(c).Width
                     Next c
-                    ' Apply same column ratio as _1, scaled to this table's own W
                     For c = 1 To nCols
                         tbl.Columns(c).Width = thisTotalW * (refColW(c) / refTotalW)
                     Next c
-                    Debug.Print "  [SYNC cols] " & shp.Name
                 End If
+                ' Sync font size for all cells
+                If refFontSz > 0 Then
+                    For r = 1 To tbl.Rows.Count
+                        For c = 1 To tbl.Columns.Count
+                            tbl.Cell(r, c).Shape.TextFrame.TextRange.Font.Size = refFontSz
+                        Next c
+                    Next r
+                End If
+                Debug.Print "  [SYNC] " & shp.Name & " fontSize=" & refFontSz
             End If
             On Error GoTo 0
         End If
