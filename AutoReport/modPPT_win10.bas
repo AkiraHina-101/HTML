@@ -183,7 +183,12 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
                          ByVal slideW As Double, ByVal slideH As Double, _
                          Optional ByVal sharedW As Double = 0)
     DeleteByName sld, shapeName
+
+    ' Fix zoom to 100% before copy so HTML pixel dimensions are consistent across sheets
+    Dim prevZoom As Long: prevZoom = rng.Parent.Parent.ActiveWindow.Zoom
+    rng.Parent.Parent.ActiveWindow.Zoom = 100
     rng.Copy
+    rng.Parent.Parent.ActiveWindow.Zoom = prevZoom
 
     Dim shp As Object
     On Error Resume Next
