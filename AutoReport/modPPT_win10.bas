@@ -113,7 +113,7 @@ Public Sub ExportToPPT()
             If Left$(labelShp.Name, 9) = "LabelOut_" Or Left$(labelShp.Name, 10) = "PPT_Label_" Then
                 ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, lblFontSz
             ElseIf Left$(labelShp.Name, 11) = "PPT_Header_" Then
-                ExportLabelShape labelShp, sld, bounds, slideW, slideH, tblFont, hdrFontSz
+                ExportHeaderShape labelShp, sld, hdrFontSz
             End If
         Next labelShp
 
@@ -408,6 +408,36 @@ Private Sub DeleteByName(ByVal sld As Object, ByVal sName As String)
             sld.Shapes(i).Delete
         End If
     Next i
+End Sub
+
+' --- Header shapes (PPT_Header_N) — write text into existing slide placeholder ---
+' Shape name suffix _N maps to placeholder index N (e.g. PPT_Header_1 -> Placeholders(1))
+' If placeholder not found, skip silently.
+Private Sub ExportHeaderShape(ByVal xlShp As Shape, ByVal sld As Object, _
+                               ByVal fontSize As Double)
+    ' Parse placeholder index from suffix (PPT_Header_1 -> 1)
+    Dim suffix  As String: suffix = Mid$(xlShp.Name, 12)   ' after "PPT_Header_"
+    Dim phIdx   As Long
+    If IsNumeric(suffix) Then phIdx = CLng(suffix) Else phIdx = 1
+
+    Dim ph As Object
+    On Error Resume Next
+    Set ph = sld.Placeholders(phIdx)
+    On Error GoTo 0
+    If ph Is Nothing Then
+        Debug.Print "  [SKIP] " & xlShp.Name & ": no placeholder " & phIdx
+        Exit Sub
+    End If
+
+    Dim txt As String: txt = xlShp.TextFrame.Characters.Text
+    On Error Resume Next
+    ph.TextFrame.TextRange.Text = txt
+    If fontSize > 0 Then
+        ph.TextFrame.TextRange.Font.Size = fontSize
+    End If
+    On Error GoTo 0
+
+    Debug.Print "  [OK] " & xlShp.Name & " -> placeholder " & phIdx & " [" & txt & "]"
 End Sub
 
 ' --- Label shapes (LabelOut_ prefix) ------------------------------------------
