@@ -1,4 +1,4 @@
-Attribute VB_Name = "modPPT_win10"
+'Attribute VB_Name = "modPPT_win10"
 Option Explicit
 
 ' =============================================================================
@@ -425,14 +425,16 @@ Public Sub CreateDataTableRanges()
 
     Do
         Dim rng As Range
+        Set rng = Nothing
         On Error Resume Next
         Set rng = Application.InputBox( _
             Prompt:="Chọn range cho " & prefix & idx & vbCrLf & "(Cancel để kết thúc)", _
             Title:="Tạo DataTable " & idx, _
             Type:=8)
+        Dim cancelErr As Long: cancelErr = Err.Number
         On Error GoTo 0
 
-        If rng Is Nothing Then Exit Do
+        If cancelErr <> 0 Or rng Is Nothing Then Exit Do
 
         Dim nmName As String: nmName = prefix & idx
         ThisWorkbook.Names.Add Name:=nmName, RefersTo:=rng
