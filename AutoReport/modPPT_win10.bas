@@ -168,29 +168,17 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
             On Error Resume Next
             Dim tbl As Object: Set tbl = shp.Table
             If Not tbl Is Nothing Then
-                ' Sync column width ratios
+                ' Apply exact dimensions from _1 (absolute col widths, row heights, total W)
                 If tbl.Columns.Count = nCols Then
-                    Dim thisTotalW As Double: thisTotalW = 0
+                    shp.Width = refTotalW
                     For c = 1 To nCols
-                        thisTotalW = thisTotalW + tbl.Columns(c).Width
+                        tbl.Columns(c).Width = refColW(c)
                     Next c
-                    If thisTotalW > 0 Then
-                        For c = 1 To nCols
-                            tbl.Columns(c).Width = thisTotalW * (refColW(c) / refTotalW)
-                        Next c
-                    End If
                 End If
-                ' Sync row height ratios (preserves each table's own total height)
-                If tbl.Rows.Count = nRows And refTotalH > 0 Then
-                    Dim thisTotalH As Double: thisTotalH = 0
+                If tbl.Rows.Count = nRows Then
                     For r = 1 To nRows
-                        thisTotalH = thisTotalH + tbl.Rows(r).Height
+                        tbl.Rows(r).Height = refRowH(r)
                     Next r
-                    If thisTotalH > 0 Then
-                        For r = 1 To nRows
-                            tbl.Rows(r).Height = thisTotalH * (refRowH(r) / refTotalH)
-                        Next r
-                    End If
                 End If
                 Debug.Print "  [SYNC] " & shp.Name
             End If
