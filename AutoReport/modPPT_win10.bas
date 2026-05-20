@@ -73,7 +73,7 @@ Public Sub ExportToPPT()
 
         Dim dtRng As Range
         Set dtRng = modLayout.FindNamedRange(ws, tableName)
-        If Not dtRng Is Nothing Then ExportTable dtRng, sld, bounds, tblShpName, slideW, slideH, tblFont, tblFontSz
+        If Not dtRng Is Nothing Then ExportTable dtRng, sld, bounds, tblShpName, slideW, slideH
 
         Dim co As chartObject
         For Each co In ws.chartObjects
@@ -109,8 +109,7 @@ End Sub
 ' --- DataTable ----------------------------------------------------------------
 Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
                          ByVal bounds As Range, ByVal shapeName As String, _
-                         ByVal slideW As Double, ByVal slideH As Double, _
-                         ByVal fontName As String, ByVal fontSize As Double)
+                         ByVal slideW As Double, ByVal slideH As Double)
     DeleteByName sld, shapeName
     rng.Copy
 
@@ -132,24 +131,8 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     shp.Width = rng.Width * scaleX
     shp.Height = rng.Height * scaleY
 
-    If shp.HasTable Then ApplyTableFont shp.Table, fontName, fontSize
-
     Debug.Print "  [OK] " & shapeName & " L=" & Pt(shp.Left) & " T=" & Pt(shp.Top) & _
                 " W=" & Pt(shp.Width) & " H=" & Pt(shp.Height)
-End Sub
-
-Private Sub ApplyTableFont(ByVal tbl As Object, _
-                            ByVal fontName As String, ByVal fontSize As Double)
-    If Len(fontName) = 0 And fontSize <= 0 Then Exit Sub
-    Dim r As Long, c As Long
-    For r = 1 To tbl.rows.count
-        For c = 1 To tbl.Columns.count
-            With tbl.cell(r, c).Shape.TextFrame.TextRange.Font
-                If Len(fontName) > 0 Then .Name = fontName
-                If fontSize > 0 Then .Size = fontSize
-            End With
-        Next c
-    Next r
 End Sub
 
 ' --- Charts -------------------------------------------------------------------
