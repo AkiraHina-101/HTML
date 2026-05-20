@@ -139,16 +139,21 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
 
     Dim scaleX As Double: scaleX = slideW / bounds.Width
     Dim scaleY As Double: scaleY = slideH / bounds.Height
+    Dim pptL   As Double: pptL = (rng.Left                  - bounds.Left) * scaleX
+    Dim pptT   As Double: pptT = (rng.Top                   - bounds.Top)  * scaleY
+    Dim pptW   As Double: pptW = (rng.Left + rng.Width      - bounds.Left) * scaleX - pptL
+    Dim pptH   As Double: pptH = (rng.Top  + rng.Height     - bounds.Top)  * scaleY - pptT
 
-    shp.Name = shapeName
-    shp.LockAspectRatio = False
-    shp.Left = (rng.Left - bounds.Left) * scaleX
-    shp.Top = (rng.Top - bounds.Top) * scaleY
-    shp.Width = rng.Width * scaleX
-    shp.Height = rng.Height * scaleY
+    shp.Name             = shapeName
+    shp.LockAspectRatio  = msoFalse
+    shp.Left             = pptL
+    shp.Top              = pptT
+    ' Set Width/Height twice: first pass breaks internal table lock, second pass applies exact size
+    shp.Width  = pptW:  shp.Height = pptH
+    shp.Width  = pptW:  shp.Height = pptH
 
-    Debug.Print "  [OK] " & shapeName & " L=" & Pt(shp.Left) & " T=" & Pt(shp.Top) & _
-                " W=" & Pt(shp.Width) & " H=" & Pt(shp.Height)
+    Debug.Print "  [OK] " & shapeName & " L=" & Pt(pptL) & " T=" & Pt(pptT) & _
+                " W=" & Pt(pptW) & " H=" & Pt(pptH)
 End Sub
 
 ' --- Charts -------------------------------------------------------------------
