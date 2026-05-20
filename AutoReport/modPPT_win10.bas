@@ -72,7 +72,7 @@ Public Sub ExportToPPT()
         pres.Application.ActiveWindow.View.GotoSlide slideIdx
         On Error GoTo CleanFail
 
-        ' Export all DataTable ranges, then sync column ratios to match _1
+        ' Export all DataTable ranges
         Dim nm      As Name
         Dim nmLocal As String
         Dim dtRng   As Range
@@ -92,6 +92,7 @@ Public Sub ExportToPPT()
             End If
         Next nm
 
+        ' Sync all tables to match _1: total W, column widths, row heights
         SyncTableColumns sld, tableName
 
         Dim co As ChartObject
@@ -140,18 +141,22 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
     On Error GoTo 0
     If refTbl Is Nothing Then Exit Sub
 
-    ' Read reference column widths and compute ratios
-    Dim nCols  As Long:  nCols = refTbl.Columns.Count
+    ' Read reference column widths and row heights
+    Dim nCols As Long: nCols = refTbl.Columns.Count
+    Dim nRows As Long: nRows = refTbl.Rows.Count
+    Dim refColW() As Double: ReDim refColW(1 To nCols)
+    Dim refRowH() As Double: ReDim refRowH(1 To nRows)
     Dim refTotalW As Double: refTotalW = 0
-    Dim refColW() As Double
-    ReDim refColW(1 To nCols)
-    Dim c As Long
+    Dim c As Long, r As Long
     For c = 1 To nCols
         refColW(c) = refTbl.Columns(c).Width
         refTotalW = refTotalW + refColW(c)
     Next c
+    For r = 1 To nRows
+        refRowH(r) = refTbl.Rows(r).Height
+    Next r
 
-    ' Apply proportional column widths to all other matching shapes
+    ' Apply to all other matching shapes: set W, col widths, row heights
     Dim i As Long
     For i = 1 To sld.Shapes.Count
         Dim shp As Object: Set shp = sld.Shapes(i)
@@ -160,18 +165,21 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
             On Error Resume Next
             Dim tbl As Object: Set tbl = shp.Table
             If Not tbl Is Nothing Then
-                If tbl.Columns.Count = nCols And refTotalW > 0 Then
-                    ' Get this table's total width
-                    Dim thisTotalW As Double: thisTotalW = 0
+                If tbl.Columns.Count = nCols Then
+                    ' Set total width first
+                    shp.Width = refTotalW
+                    ' Sync column widths (absolute)
                     For c = 1 To nCols
-                        thisTotalW = thisTotalW + tbl.Columns(c).Width
+                        tbl.Columns(c).Width = refColW(c)
                     Next c
-                    ' Apply same ratio as _1
-                    For c = 1 To nCols
-                        tbl.Columns(c).Width = thisTotalW * (refColW(c) / refTotalW)
-                    Next c
-                    Debug.Print "  [SYNC cols] " & shp.Name
                 End If
+                ' Sync row heights (absolute) if row count matches
+                If tbl.Rows.Count = nRows Then
+                    For r = 1 To nRows
+                        tbl.Rows(r).Height = refRowH(r)
+                    Next r
+                End If
+                Debug.Print "  [SYNC] " & shp.Name
             End If
             On Error GoTo 0
         End If
