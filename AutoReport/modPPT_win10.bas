@@ -185,10 +185,15 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     DeleteByName sld, shapeName
 
     ' Fix zoom to 100% before copy so HTML pixel dimensions are consistent across sheets
-    Dim prevZoom As Long: prevZoom = rng.Parent.Parent.ActiveWindow.Zoom
-    rng.Parent.Parent.ActiveWindow.Zoom = 100
+    Dim prevZoom As Long
+    On Error Resume Next
+    prevZoom = Application.ActiveWindow.Zoom
+    Application.ActiveWindow.Zoom = 100
+    On Error GoTo 0
     rng.Copy
-    rng.Parent.Parent.ActiveWindow.Zoom = prevZoom
+    On Error Resume Next
+    Application.ActiveWindow.Zoom = prevZoom
+    On Error GoTo 0
 
     Dim shp As Object
     On Error Resume Next
