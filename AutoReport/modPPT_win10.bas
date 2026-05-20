@@ -72,23 +72,10 @@ Public Sub ExportToPPT()
         pres.Application.ActiveWindow.View.GotoSlide slideIdx
         On Error GoTo CleanFail
 
-        ' Pass 1: get width of the first DataTable (tableName & "_1") as shared width
+        ' Export all DataTable ranges, then sync column ratios to match _1
         Dim nm      As Name
         Dim nmLocal As String
         Dim dtRng   As Range
-        Dim maxTblW As Double: maxTblW = 0
-        Dim scaleXt As Double: scaleXt = slideW / bounds.Width
-        Dim firstRng As Range
-        Set firstRng = Nothing
-        On Error Resume Next
-        Set firstRng = ThisWorkbook.Names(tableName & "_1").RefersToRange
-        On Error GoTo CleanFail
-        If Not firstRng Is Nothing Then
-            maxTblW = firstRng.Width * scaleXt
-        End If
-        Debug.Print "  [TBL sharedW from _1] " & Pt(maxTblW)
-
-        ' Pass 2: export each table using shared maxTblW
         For Each nm In ThisWorkbook.Names
             nmLocal = nm.Name
             If InStr(nmLocal, "!") > 0 Then nmLocal = Mid$(nmLocal, InStr(nmLocal, "!") + 1)
@@ -99,13 +86,12 @@ Public Sub ExportToPPT()
                 On Error GoTo CleanFail
                 If Not dtRng Is Nothing Then
                     If StrComp(dtRng.Parent.Name, ws.Name, vbTextCompare) = 0 Then
-                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH, maxTblW
+                        ExportTable dtRng, sld, bounds, nmLocal, slideW, slideH
                     End If
                 End If
             End If
         Next nm
 
-        ' Pass 3: sync column widths of all tables to match table_1
         SyncTableColumns sld, tableName
 
         Dim co As ChartObject
@@ -154,16 +140,18 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
     On Error GoTo 0
     If refTbl Is Nothing Then Exit Sub
 
-    ' Read reference column widths
-    Dim nCols As Long: nCols = refTbl.Columns.Count
+    ' Read reference column widths and compute ratios
+    Dim nCols  As Long:  nCols = refTbl.Columns.Count
+    Dim refTotalW As Double: refTotalW = 0
     Dim refColW() As Double
     ReDim refColW(1 To nCols)
     Dim c As Long
     For c = 1 To nCols
         refColW(c) = refTbl.Columns(c).Width
+        refTotalW = refTotalW + refColW(c)
     Next c
 
-    ' Apply to all other matching shapes on this slide
+    ' Apply proportional column widths to all other matching shapes
     Dim i As Long
     For i = 1 To sld.Shapes.Count
         Dim shp As Object: Set shp = sld.Shapes(i)
@@ -172,9 +160,15 @@ Private Sub SyncTableColumns(ByVal sld As Object, ByVal tablePrefix As String)
             On Error Resume Next
             Dim tbl As Object: Set tbl = shp.Table
             If Not tbl Is Nothing Then
-                If tbl.Columns.Count = nCols Then
+                If tbl.Columns.Count = nCols And refTotalW > 0 Then
+                    ' Get this table's total width
+                    Dim thisTotalW As Double: thisTotalW = 0
                     For c = 1 To nCols
-                        tbl.Columns(c).Width = refColW(c)
+                        thisTotalW = thisTotalW + tbl.Columns(c).Width
+                    Next c
+                    ' Apply same ratio as _1
+                    For c = 1 To nCols
+                        tbl.Columns(c).Width = thisTotalW * (refColW(c) / refTotalW)
                     Next c
                     Debug.Print "  [SYNC cols] " & shp.Name
                 End If
@@ -206,7 +200,6 @@ Private Sub ExportTable(ByVal rng As Range, ByVal sld As Object, _
     Dim pptT   As Double: pptT = (rng.Top  - bounds.Top)  * scaleY
     Dim pptW   As Double: pptW = rng.Width  * scaleX
     Dim pptH   As Double: pptH = rng.Height * scaleY
-    If sharedW > 0 Then pptW = sharedW
 
     shp.Name            = shapeName
     shp.LockAspectRatio = msoFalse
